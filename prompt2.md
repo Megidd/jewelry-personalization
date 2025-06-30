@@ -91,7 +91,7 @@ Possible business models:
 | Model                   | Target                  | Customer | Retail | Manufacturer | Manu. Equipments | Manu. Tech | Channel Tech | Product | Market |
 | ----------------------- | ----------------------- | -------- | ------ | ------------ | ---------------- | ---------- | ------------ | ------- | ------ |
 | Worldwide Retailers     | All Retailers           | No       | No     | No           | No               | No         | Yes          | Yes     | Global |
-| Local Manufacturing     | Amazon, Zalando, Retails | No       | No     | Yes          | Yes              | Yes        | Yes          | Yes     | Local  |
+| Local Manufacturing     | Amazon, Zalando, Retail | No       | No     | Yes          | Yes              | Yes        | Yes          | Yes     | Local  |
 | Sell Locally            | Local market            | Yes      | Yes    | Yes          | Yes              | Yes        | Yes          | Yes     | Local  |
 | Manufacturing Supported | Big Retailers           | No       | No     | No           | Yes              | Yes        | Yes          | Yes     | Global |
 | Service Bureau          | Customers               | Yes      | Yes    | No           | No               | No         | Yes          | Yes     | Global |
