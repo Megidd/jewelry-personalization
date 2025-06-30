@@ -1,6 +1,7 @@
 # Agenda
 
 - [ ] Specifications
+   - [ ] Widget:
 - [ ] Prompt engineering for Claude 4
    - [ ] Strategic approach
    - [ ] Roadmap and timeline
