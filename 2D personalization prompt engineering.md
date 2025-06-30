@@ -35,12 +35,6 @@ The solution is to provide a platform for:
 
 Looks like the core domain might be the workshop side of the platform. Since the customer side might _not_ be that unclear.
 
-Core domain in need of optimization:
-
-* Inventory
-* Scheduling
-* ...
-
 # Business models
 
 There are at least two business models possible:
