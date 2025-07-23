@@ -60,11 +60,11 @@ function init() {
 // Load Three.js fonts
 function loadFonts() {
     const fontLoader = new THREE.FontLoader();
-    const fontNames = ['helvetiker', 'optimer', 'gentilis'];
+    const fontNames = ['Monsieur La Doulaise_Regular', 'Imperial Script_Regular', 'Miss Fajardose_Regular'];
 
     fontNames.forEach(fontName => {
         fontLoader.load(
-            `./6_fonts/${fontName}_regular.typeface.json`,  // Changed to local path
+            `./6_fonts/${fontName}.json`,  // Changed to local path
             (font) => {
                 fonts[fontName] = font;
                 if (Object.keys(fonts).length === fontNames.length) {
