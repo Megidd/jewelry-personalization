@@ -179,6 +179,8 @@ function createCurvedText(text, font, ringSize) {
         // Calculate angle for this character
         const angle = startAngle + i * charAngle;
 
+        // Adjust the radius - If the text is slightly inside or outside the ring surface:
+        //
         // Position letter on the ring's outer surface
         // The text should sit on the ring, so we use outer radius
         //
@@ -189,9 +191,15 @@ function createCurvedText(text, font, ringSize) {
         //
         const radius = ringOuterRadius + 0.1;
         
+        // Fine-tune individual letter positioning - If you need to adjust how each letter sits:
+        //
+        // Letter positioning section:
         letterMesh.position.x = Math.sin(angle) * radius;
         letterMesh.position.z = Math.cos(angle) * radius;
-        letterMesh.position.y = 0; // Center vertically
+        //
+        // Center vertically by: letterMesh.position.y = 0;
+        // You can add small adjustments here per letter
+        letterMesh.position.y = 0; 
 
         // Rotate letter to be perpendicular to radius
         letterMesh.rotation.y = -angle;
@@ -212,6 +220,8 @@ function createCurvedText(text, font, ringSize) {
     // Since we rotated around X, we need to adjust the position
     textGroup.position.y = ringHeight / 2; // Place at the top of the ring
 
+    // Fine-tune the vertical position - Adjust the Y position if the text is slightly above or below where it should be:
+    //
     // Adjust this line:
     // Try values like ringHeight/2 - 0.5 or ringHeight/2 + 0.5
     textGroup.position.y = ringHeight / 2 - 1.5;
