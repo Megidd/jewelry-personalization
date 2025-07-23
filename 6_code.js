@@ -123,8 +123,8 @@ function createRing(size) {
     return new THREE.Mesh(ringGeometry, material);
 }
 
-// Create curved text - simplified version
-function createCurvedText(text, font, ringSize) {
+// Create curved text - with user-controlled spacing and arc
+function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
     const ringHeight = 2.5; // Ring height in mm
@@ -136,10 +136,31 @@ function createCurvedText(text, font, ringSize) {
     const textSize = 1.5; // Slightly smaller for better fit
     const textDepth = 0.6; // Depth of text extrusion
 
-    // Calculate total angle based on text length
-    const charAngle = 0.12; // Angle per character in radians
-    const totalAngle = Math.min(Math.PI / 2, text.length * charAngle);
+    // Convert maxArc from degrees to radians
+    const maxArcRadians = (maxArcDegrees * Math.PI) / 180;
+    
+    // Remove spaces for character count
+    const textWithoutSpaces = text.replace(/ /g, '');
+    const charCount = textWithoutSpaces.length;
+    
+    if (charCount === 0) return textGroup;
+
+    // Calculate angle per character with letter spacing
+    const baseCharAngle = 0.12; // Base angle per character
+    const adjustedCharAngle = baseCharAngle * letterSpacing;
+    
+    // Calculate total angle needed for text
+    const totalAngleNeeded = charCount * adjustedCharAngle;
+    
+    // Use either the needed angle or max arc, whichever is smaller
+    const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
+    
+    // Calculate actual angle per character (might be compressed if hitting max arc)
+    const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
     const startAngle = -totalAngle / 2;
+
+    // Track character index (excluding spaces)
+    let charIndex = 0;
 
     // Create each letter
     for (let i = 0; i < text.length; i++) {
@@ -177,60 +198,30 @@ function createCurvedText(text, font, ringSize) {
         );
 
         // Calculate angle for this character
-        const angle = startAngle + i * charAngle;
+        const angle = startAngle + charIndex * actualCharAngle;
 
-        // Adjust the radius - If the text is slightly inside or outside the ring surface:
-        //
         // Position letter on the ring's outer surface
-        // The text should sit on the ring, so we use outer radius
-        //
-        // Adjust the radius calculation:
-        // ringOuterRadius + 0.1; // Add a small offset if text is too deep
-        // or
-        // ringOuterRadius - 0.1; // Subtract if text is floating
-        //
         const radius = ringOuterRadius + 0.1;
         
-        // Fine-tune individual letter positioning - If you need to adjust how each letter sits:
-        //
-        // Letter positioning section:
         letterMesh.position.x = Math.sin(angle) * radius;
         letterMesh.position.z = Math.cos(angle) * radius;
-        //
-        // Center vertically by: letterMesh.position.y = 0;
-        // You can add small adjustments here per letter
         letterMesh.position.y = 0; 
 
         // Rotate letter to be perpendicular to radius
         letterMesh.rotation.z = -angle;
 
         textGroup.add(letterMesh);
+        charIndex++;
     }
 
-    // For text on the front: textGroup.rotation.x = 0; (original position)
-    // For text on the top: textGroup.rotation.x = -Math.PI / 2;
-    // For text on the back: textGroup.rotation.x = Math.PI;
-    // For text on the bottom: textGroup.rotation.x = Math.PI / 2;
-    //
-    // IMPORTANT: Rotate the entire text group 90 degrees around X axis
-    // This places the text on the ring's surface instead of inside it
+    // Rotate the entire text group 90 degrees around X axis
     textGroup.rotation.x = -Math.PI / 2;
     
     // Position the text group at the correct height on the ring
-    // Since we rotated around X, we need to adjust the position
-    textGroup.position.y = ringHeight / 2; // Place at the top of the ring
-
-    // Fine-tune the vertical position - Adjust the Y position if the text is slightly above or below where it should be:
-    //
-    // Adjust this line:
-    // Try values like ringHeight/2 - 0.5 or ringHeight/2 + 0.5
     textGroup.position.y = ringHeight / 2 - 1.5;
 
-    // Adjust text depth penetration - If the text should be embedded more or less into the ring:
-    //
-    // After setting textGroup rotation and before returning:
-    textGroup.position.z = -0.2; // Negative to push into ring, positive to pull out
-
+    // Adjust text depth penetration
+    textGroup.position.z = -0.2;
 
     return textGroup;
 }
@@ -249,11 +240,13 @@ function combineRingAndText(ring, textGroup, ringSize) {
     return combinedGroup;
 }
 
-// Update the updateRing function to remove the extra rotation
+// Update the updateRing function to use new parameters
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
     const fontName = document.getElementById('fontSelect').value;
     const ringSize = document.getElementById('ringSize').value;
+    const letterSpacing = parseFloat(document.getElementById('letterSpacing').value);
+    const maxArc = parseFloat(document.getElementById('maxArc').value);
 
     if (!fonts[fontName]) {
         document.getElementById('status').textContent = 'Loading fonts...';
@@ -270,14 +263,11 @@ function updateRing() {
     // Create ring
     ringMesh = createRing(ringSize);
 
-    // Create curved text
-    const textGroup = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize);
+    // Create curved text with user-controlled parameters
+    const textGroup = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing, maxArc);
 
     // Combine ring and text
     finalMesh = combineRingAndText(ringMesh, textGroup, ringSize);
-
-    // No rotation needed - view ring from the side
-    // finalMesh.rotation.x = Math.PI / 2; // Remove this line
 
     scene.add(finalMesh);
 
