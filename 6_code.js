@@ -206,6 +206,11 @@ function createCurvedText(text, font, ringSize) {
     // Since we rotated around X, we need to adjust the position
     textGroup.position.y = ringHeight / 2; // Place at the top of the ring
 
+    // Adjust this line:
+    // Try values like ringHeight/2 - 0.5 or ringHeight/2 + 0.5
+    textGroup.position.y = ringHeight / 2 - 1.5;
+
+
     return textGroup;
 }
 
