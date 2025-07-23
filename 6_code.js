@@ -189,30 +189,30 @@ function createCurvedText(text, font, ringSize) {
 function combineRingAndText(ring, textGroup, ringSize) {
     const ringData = RING_SIZES[ringSize];
     const radius = (ringData.innerDiameter + ringData.outerDiameter) / 4;
-    
+
     // Create a unified mesh from text group
     const textGeometries = [];
     textGroup.children.forEach(child => {
         const geometry = child.geometry.clone();
-        geometry.applyMatrix4(child.matrix);
+        
+        // Important: Update the world matrix before applying
+        child.updateMatrixWorld(true);
+        
+        // Apply the world transformation to the geometry
+        geometry.applyMatrix4(child.matrixWorld);
+        
         textGeometries.push(geometry);
     });
-    
+
     // Merge text geometries
     const mergedTextGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(textGeometries);
     const textMesh = new THREE.Mesh(mergedTextGeometry, ring.material);
-    
-    // Position text on ring surface
-    textMesh.position.y = 0;
-    
+
     // Create final combined mesh
     const combinedGroup = new THREE.Group();
     combinedGroup.add(ring.clone());
     combinedGroup.add(textMesh);
-    
-    // For proper STL export, we should merge into single geometry
-    // This is simplified for now - in production, use proper CSG operations
-    
+
     return combinedGroup;
 }
 
