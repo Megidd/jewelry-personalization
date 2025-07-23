@@ -202,7 +202,7 @@ function createCurvedText(text, font, ringSize) {
         letterMesh.position.y = 0; 
 
         // Rotate letter to be perpendicular to radius
-        letterMesh.rotation.y = -angle;
+        letterMesh.rotation.z = -angle;
 
         textGroup.add(letterMesh);
     }
