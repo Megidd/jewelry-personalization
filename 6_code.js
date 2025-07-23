@@ -123,131 +123,128 @@ function createRing(size) {
     return new THREE.Mesh(ringGeometry, material);
 }
 
-
-// Create curved text
+// Create curved text - simplified version
 function createCurvedText(text, font, ringSize) {
     const ringData = RING_SIZES[ringSize];
-    const radius = (ringData.innerDiameter + ringData.outerDiameter) / 4;
+    const ringOuterRadius = ringData.outerDiameter / 2;
+    const ringHeight = 2.5; // Ring height in mm
     
     // Create a group to hold all letters
     const textGroup = new THREE.Group();
-    
-    // Calculate total text width to center it
-    const textSize = 2; // Height of text in mm
-    const textDepth = 0.8; // Depth of text extrusion
-    
-    // Maximum angle is 90 degrees (π/2 radians)
-    const maxAngle = Math.PI / 2;
-    const anglePerChar = maxAngle / (text.length + 1);
-    const startAngle = -maxAngle / 2;
-    
+
+    // Text parameters
+    const textSize = 1.5; // Slightly smaller for better fit
+    const textDepth = 0.6; // Depth of text extrusion
+
+    // Calculate total angle based on text length
+    const charAngle = 0.12; // Angle per character in radians
+    const totalAngle = Math.min(Math.PI / 2, text.length * charAngle);
+    const startAngle = -totalAngle / 2;
+
     // Create each letter
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
         
+        if (char === ' ') continue; // Skip spaces
+
         const textGeometry = new THREE.TextGeometry(char, {
             font: font,
             size: textSize,
             height: textDepth,
             curveSegments: 12,
             bevelEnabled: true,
-            bevelThickness: 0.1,
-            bevelSize: 0.1,
-            bevelSegments: 8
+            bevelThickness: 0.05,
+            bevelSize: 0.05,
+            bevelSegments: 5
         });
-        
+
         // Center the letter geometry
         textGeometry.computeBoundingBox();
         const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
-        textGeometry.translate(-centerX, -centerY, 0);
         
+        // Important: Center in Z direction too
+        textGeometry.translate(-centerX, -centerY, 0);
+
         const letterMesh = new THREE.Mesh(
             textGeometry,
-            new THREE.MeshPhongMaterial({ color: 0xFFD700 })
+            new THREE.MeshPhongMaterial({ 
+                color: 0xFFD700,
+                metalness: 0.8,
+                roughness: 0.2
+            })
         );
+
+        // Calculate angle for this character
+        const angle = startAngle + i * charAngle;
+
+        // Position letter on the ring's outer surface
+        // The text should sit on the ring, so we use outer radius
+        const radius = ringOuterRadius;
         
-        // Calculate position on curve
-        const angle = startAngle + (i + 1) * anglePerChar;
-        
-        // Position letter
         letterMesh.position.x = Math.sin(angle) * radius;
-        letterMesh.position.z = Math.cos(angle) * radius - radius;
-        letterMesh.position.y = 0;
-        
+        letterMesh.position.z = Math.cos(angle) * radius;
+        letterMesh.position.y = 0; // Center vertically
+
         // Rotate letter to be perpendicular to radius
         letterMesh.rotation.y = -angle;
-        
+
         textGroup.add(letterMesh);
     }
-    
+
+    // Position the entire text group at the correct height on the ring
+    textGroup.position.y = 0; // Adjust this if needed
+
     return textGroup;
 }
 
-// Combine ring and text
+// Combine ring and text - simplified version
 function combineRingAndText(ring, textGroup, ringSize) {
-    const ringData = RING_SIZES[ringSize];
-    const radius = (ringData.innerDiameter + ringData.outerDiameter) / 4;
-
-    // Create a unified mesh from text group
-    const textGeometries = [];
-    textGroup.children.forEach(child => {
-        const geometry = child.geometry.clone();
-        
-        // Important: Update the world matrix before applying
-        child.updateMatrixWorld(true);
-        
-        // Apply the world transformation to the geometry
-        geometry.applyMatrix4(child.matrixWorld);
-        
-        textGeometries.push(geometry);
-    });
-
-    // Merge text geometries
-    const mergedTextGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(textGeometries);
-    const textMesh = new THREE.Mesh(mergedTextGeometry, ring.material);
-
-    // Create final combined mesh
+    // Create final combined group
     const combinedGroup = new THREE.Group();
+    
+    // Add ring
     combinedGroup.add(ring.clone());
-    combinedGroup.add(textMesh);
+    
+    // Add text group
+    combinedGroup.add(textGroup);
 
     return combinedGroup;
 }
 
-// Update ring with new parameters
+// Update the updateRing function to remove the extra rotation
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
     const fontName = document.getElementById('fontSelect').value;
     const ringSize = document.getElementById('ringSize').value;
-    
+
     if (!fonts[fontName]) {
         document.getElementById('status').textContent = 'Loading fonts...';
         return;
     }
-    
+
     document.getElementById('status').textContent = 'Generating...';
-    
+
     // Clear previous meshes
     if (finalMesh) {
         scene.remove(finalMesh);
     }
-    
+
     // Create ring
     ringMesh = createRing(ringSize);
-    
+
     // Create curved text
     const textGroup = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize);
-    
+
     // Combine ring and text
     finalMesh = combineRingAndText(ringMesh, textGroup, ringSize);
-    
-    // Rotate to better viewing angle
-    finalMesh.rotation.x = Math.PI / 2;
-    
+
+    // No rotation needed - view ring from the side
+    // finalMesh.rotation.x = Math.PI / 2; // Remove this line
+
     scene.add(finalMesh);
-    
+
     document.getElementById('status').textContent = 'Ready';
 }
 
