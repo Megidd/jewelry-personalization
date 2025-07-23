@@ -91,20 +91,28 @@ function createRing(size) {
     const outerRadius = ringData.outerDiameter / 2;
     const height = 2.5; // Ring height in mm
 
-    // Create ring as a cylinder with hole
-    const outerCylinder = new THREE.CylinderGeometry(
-        outerRadius, outerRadius, height, 64
-    );
-    const innerCylinder = new THREE.CylinderGeometry(
-        innerRadius, innerRadius, height + 1, 64
-    );
-
-    // Use CSG to subtract inner from outer
-    const outerCSG = CSG.fromGeometry(outerCylinder);
-    const innerCSG = CSG.fromGeometry(innerCylinder);
-    const ringCSG = outerCSG.subtract(innerCSG);
+    // Create ring using RingGeometry extruded
+    const shape = new THREE.Shape();
     
-    const ringGeometry = CSG.toGeometry(ringCSG, new THREE.Matrix4());
+    // Outer circle
+    shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
+    
+    // Inner circle (hole)
+    const hole = new THREE.Path();
+    hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+    
+    // Extrude settings
+    const extrudeSettings = {
+        steps: 1,
+        depth: height,
+        bevelEnabled: false
+    };
+    
+    const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    
+    // Center the geometry
+    ringGeometry.center();
     
     const material = new THREE.MeshPhongMaterial({
         color: 0xFFD700,
@@ -114,6 +122,7 @@ function createRing(size) {
 
     return new THREE.Mesh(ringGeometry, material);
 }
+
 
 // Create curved text
 function createCurvedText(text, font, ringSize) {
