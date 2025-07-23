@@ -193,6 +193,11 @@ function createCurvedText(text, font, ringSize) {
         textGroup.add(letterMesh);
     }
 
+    // For text on the front: textGroup.rotation.x = 0; (original position)
+    // For text on the top: textGroup.rotation.x = -Math.PI / 2;
+    // For text on the back: textGroup.rotation.x = Math.PI;
+    // For text on the bottom: textGroup.rotation.x = Math.PI / 2;
+    //
     // IMPORTANT: Rotate the entire text group 90 degrees around X axis
     // This places the text on the ring's surface instead of inside it
     textGroup.rotation.x = -Math.PI / 2;
