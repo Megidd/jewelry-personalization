@@ -61,15 +61,24 @@ function init() {
 function loadFonts() {
     const fontLoader = new THREE.FontLoader();
     const fontNames = ['helvetiker', 'optimer', 'gentilis'];
-    
+
     fontNames.forEach(fontName => {
         fontLoader.load(
-            `https://threejs.org/examples/fonts/${fontName}_regular.typeface.json`,
+            `./6_fonts/${fontName}_regular.typeface.json`,  // Changed to local path
             (font) => {
                 fonts[fontName] = font;
                 if (Object.keys(fonts).length === fontNames.length) {
                     updateRing(); // Generate initial ring
                 }
+            },
+            // Progress callback (optional)
+            (xhr) => {
+                console.log(`${fontName} ${(xhr.loaded / xhr.total * 100)}% loaded`);
+            },
+            // Error callback
+            (error) => {
+                console.error(`Error loading ${fontName} font:`, error);
+                document.getElementById('status').textContent = `Error loading ${fontName} font`;
             }
         );
     });
