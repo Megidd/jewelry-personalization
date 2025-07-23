@@ -226,6 +226,11 @@ function createCurvedText(text, font, ringSize) {
     // Try values like ringHeight/2 - 0.5 or ringHeight/2 + 0.5
     textGroup.position.y = ringHeight / 2 - 1.5;
 
+    // Adjust text depth penetration - If the text should be embedded more or less into the ring:
+    //
+    // After setting textGroup rotation and before returning:
+    textGroup.position.z = -0.2; // Negative to push into ring, positive to pull out
+
 
     return textGroup;
 }
