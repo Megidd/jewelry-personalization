@@ -181,7 +181,13 @@ function createCurvedText(text, font, ringSize) {
 
         // Position letter on the ring's outer surface
         // The text should sit on the ring, so we use outer radius
-        const radius = ringOuterRadius;
+        //
+        // Adjust the radius calculation:
+        // ringOuterRadius + 0.1; // Add a small offset if text is too deep
+        // or
+        // ringOuterRadius - 0.1; // Subtract if text is floating
+        //
+        const radius = ringOuterRadius + 0.1;
         
         letterMesh.position.x = Math.sin(angle) * radius;
         letterMesh.position.z = Math.cos(angle) * radius;
