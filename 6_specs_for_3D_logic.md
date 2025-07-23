@@ -19,6 +19,10 @@ The frontend technologies like JavaScrip and libraries like ThreeJS would offloa
 
 The backend technologies like Python or Golang would require a more expensive server to do the 3D processing.
 
+### Preference
+
+Therefore, JavaScript technology is preferred along with a robus library like ThreeJS.
+
 # Input
 
 * Text
@@ -40,7 +44,9 @@ The backend technologies like Python or Golang would require a more expensive se
 
 ## Ring creation
 
-The logic would create a simple 3D model for the ring according to the standard size passed as input. The ring is just like a simple tube or donut or torus. ~~The ring is created in STL ASCII file format.~~
+The logic would create a simple 3D model for the ring according to the standard size passed as input. The ring is just like a simple tube or donut or torus.
+
+A sample STL file is attached to be used as the ring, if needed.
 
 ## Text adjustment
 
@@ -52,9 +58,29 @@ The logic would create a simple 3D model for the ring according to the standard 
 * Text 3D model is resized so that it can fit properly on the ring.
 * Text 3D model can occupy at most 90 degrees out of the 360 degrees available on the ring.
 
+### Mathematical formulas for curvature
+
+For now, some sane assumptions might be employed for curvature formulas.
+
 ## Ring cut
 
 The 3D model of the ring is cut at the location which is occupied by the text 3D model. But the 3D model of the ring is properly connected to the 3D text to be a coherent 3D model without falling apart.
+
+## Precise measurements
+
+* Ring thickness/width
+   * For now, a reasonable assumption is made according to:
+      * Ring size passed as input
+* Text depth/height relative to ring
+   * For now, a resaonable assumption is made according to:
+      * Ring size passed as input
+* Minimum/maximum text size constraints
+   * For now, a reasonable assumption is made according to:
+      * Ring size passed as input
+* Gap tolerances between letters
+   * For now, a reasonable assumption is made according to:
+      * Ring size passed as input
+      * SLA 3D print constraints
 
 # Output
 
@@ -70,3 +96,26 @@ The UI would display the final 3D model. User can view the final 3D model.
 # UI
 
 A minimal UI to take inputs and display the output would be great to test and evaluate the reliability of the logic.
+
+## HTML, CSS, and JavaScript
+
+The minimal UI can be a simple HTML/CSS file. The file would make use of the JavaScript code and libraries like ThreeJS to handle the 3D processing.
+
+# Data format
+
+Any data format might be picked up. Like:
+
+* Data buffers provided by the libraries employed.
+* STL ASCII file format.
+* Any other data format.
+
+Readability and reliability will be preserved.
+
+# Manufacturing constraints
+
+For now, the manufacturing constraints are ignored, like:
+
+* SLA 3D print constraints
+* Metal casting constraints
+
+Currently, we just focus on aesthetics and user preference.
