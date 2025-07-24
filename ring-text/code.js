@@ -64,7 +64,7 @@ function loadFonts() {
 
     fontNames.forEach(fontName => {
         fontLoader.load(
-            `./6_fonts/${fontName}.json`,  // Changed to local path
+            `./fonts/${fontName}.json`,  // Changed to local path
             (font) => {
                 fonts[fontName] = font;
                 if (Object.keys(fonts).length === fontNames.length) {
