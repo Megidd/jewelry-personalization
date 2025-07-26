@@ -136,7 +136,7 @@ function createRing(size) {
 }
 
 // Create curved text using BufferGeometry
-function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
+function createCurvedText(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
     const ringHeight = calculateRingHeight(ringSize);
@@ -148,8 +148,8 @@ function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
     const textSize = calculateTextSize(ringSize);
     const textDepth = textSize * 0.5;
 
-    // Convert maxArc from degrees to radians
-    const maxArcRadians = (maxArcDegrees * Math.PI) / 180;
+    // Fixed max arc of 180 degrees (π radians)
+    const maxArcRadians = Math.PI;
 
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');
@@ -345,7 +345,6 @@ function updateRing() {
     const fontName = document.getElementById('fontSelect').value;
     const ringSize = document.getElementById('ringSize').value;
     const letterSpacing = parseFloat(document.getElementById('letterSpacing').value);
-    const maxArc = parseFloat(document.getElementById('maxArc').value);
 
     if (!fonts[fontName]) {
         showStatus('Loading fonts...', 'normal');
@@ -366,7 +365,7 @@ function updateRing() {
         ringMesh = createRing(ringSize);
 
         // Create curved text
-        textMesh = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing, maxArc);
+        textMesh = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
 
         // Combine ring and text into a single mesh
         finalMesh = combineRingAndText(ringMesh, textMesh);

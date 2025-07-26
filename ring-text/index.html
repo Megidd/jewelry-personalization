@@ -134,14 +134,6 @@
                    oninput="document.getElementById('letterSpacingValue').textContent = this.value; updateRing()">
         </div>
 
-        <div class="control-group">
-            <label for="maxArc">
-                Max Arc (degrees): <span class="range-value" id="maxArcValue">180</span>
-            </label>
-            <input type="range" id="maxArc" min="90" max="270" step="10" value="180" 
-                   oninput="document.getElementById('maxArcValue').textContent = this.value; updateRing()">
-        </div>
-
         <button onclick="updateRing()">Generate Ring</button>
         <button onclick="exportSTL()">Export STL</button>
         
