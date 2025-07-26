@@ -166,8 +166,8 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
     const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
     const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
 
-    // Add π/2 to start angle to move text from x-axis to y-axis
-    const startAngle = -totalAngle / 2 + Math.PI / 2;
+    // Start from left side and go right
+    const startAngle = totalAngle / 2 + Math.PI / 2;
 
     let charIndex = 0;
 
@@ -196,15 +196,13 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Center the letter geometry
         textGeometry.translate(-centerX, -centerY, 0);
 
-        // Calculate angle for this character
-        const angle = startAngle + charIndex * actualCharAngle;
+        // Calculate angle for this character (decreasing to go left-to-right)
+        const angle = startAngle - charIndex * actualCharAngle;
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
         // Position on the outer surface of the ring
-        // We want the back of the text (z = 0) to just touch the ring surface
-        // So we position at ringOuterRadius without additional offset
         const radius = ringOuterRadius;
         
         // Position in X-Y plane (ring is along Z axis)
@@ -212,19 +210,27 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         const y = Math.sin(angle) * radius;
         const z = 0; // Center along the ring's height
         
-        // Create rotation to face outward from center
-        // Text should be perpendicular to the radius
-        const rotationZ = angle + Math.PI / 2; // Rotate to be tangent to the circle
+        // FIXED: Apply rotations in correct order
+        // First rotate 180° around X to flip the letter right-side-up
+        const flipX = new THREE.Matrix4().makeRotationX(Math.PI);
+        matrix.multiply(flipX);
         
-        // Apply rotation first, then translation
-        matrix.makeRotationZ(rotationZ);
+        // Then rotate 180° around Y to un-mirror the letter
+        const flipY = new THREE.Matrix4().makeRotationY(Math.PI);
+        matrix.multiply(flipY);
+        
+        // Finally rotate to face outward from the center
+        const rotationZ = angle + Math.PI / 2;
+        const rotZ = new THREE.Matrix4().makeRotationZ(rotationZ);
+        matrix.multiply(rotZ);
+        
+        // Position it
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
         
-        // Now we need to translate the letter outward by a small amount so the bottom touches but doesn't penetrate
-        // Since the text has been rotated, we need to move it in the direction of the normal
+        // Move the letter slightly outward
         const normalX = Math.cos(angle);
         const normalY = Math.sin(angle);
         
