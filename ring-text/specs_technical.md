@@ -52,12 +52,18 @@ The logic would create a simple 3D model for the ring according to the standard 
 
 * Text is convereted to a 3D model according to the font passed as input.
 * A curvature is applied to the text 3D model to be able to add it to the 3D model of the ring.
-   * Implementing proper curving in addition to positioning for each letter.
-* A different curvature might be applied to each letter of the text 3D model.
-   * So that each text letter is perpendicular to the ring radius.
-   * So that each text letter has proper curving in addition to positioning.
+   * Focusing on text baseline is not the current approach.
+   * Each should individual letter should be rotated and positioned properly.
+* A curvature might be applied to each letter of the text 3D model.
+   * Implementing proper curving is done by applying proper rotation and position to each letter.
+   * So that each individual letter is perpendicular to the ring radius.
+   * So that each individual letter has proper curving in addition to positioning.
+   * Individual letters shouldn't be deformed or warped.
+   * Each letter can be roated around the cylindrical axis of the ring to follow the ring’s cylindrical surface.
 * Text 3D model is resized so that it can fit properly on the ring.
+   * Spacing between letters can be adjusted too.
 * Text 3D model can occupy an arch in degrees available on the ring.
+   * Spacing between letters can be adjusted.
 
 ### Mathematical formulas for curvature
 
@@ -76,6 +82,16 @@ https://github.com/gkjohnson/three-bvh-csg
 A demo of the CSG library is available on ThreeJS official website at this page:
 
 https://threejs.org/examples/webgl_geometry_csg.html
+
+#### CSG expense
+
+CSG can be computationally expensive. But for now, ignore the computational expense.
+
+CSG operations are done in real-time.
+
+#### CSG fail
+
+If CSG operations fail or produce invalid geometry, show an alert on the UI and ask user to change inputs accordingly.
 
 ## Precise measurements
 
@@ -103,6 +119,7 @@ These 3D models are connected together to create the final 3D model:
    * Curved and resized according to the ring size and curvature.
 * Total weight:
    * Eeight estimation based on volume calculation and gold's material density.
+   * Weight = Volume × Material Density
 
 The UI would display the final 3D model. User can view the final 3D model.
 
@@ -136,6 +153,10 @@ Currently, we just focus on aesthetics and user preference.
 ## Witertight
 
 At the moment, it should be ensured that the final mesh is a single, watertight geometry suitable for 3D printing
+
+### Validation
+
+Validation of watertight geometry can be ignored for now.
 
 # Example
 
