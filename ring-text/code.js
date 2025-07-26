@@ -193,7 +193,8 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
         
-        // IMPORTANT: Get the depth BEFORE transformations
+        // Get the letter dimensions before transformation
+        const letterHeight = bbox.max.y - bbox.min.y;
         const letterDepth = bbox.max.z - bbox.min.z;
 
         // Center the letter geometry in X and Y, but not Z
@@ -205,9 +206,9 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // FIXED: Position the letter so its back face will touch the ring
-        // We need to account for the letter depth when positioning
-        const radius = ringOuterRadius + letterDepth;
+        // Position at ring's outer radius
+        // The letter will be positioned so its bottom edge touches the ring
+        const radius = ringOuterRadius;
         
         // Position in X-Y plane (ring is along Z axis)
         const x = Math.cos(angle) * radius;
@@ -234,13 +235,15 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
         
-        // Add a small gap between letter and ring
+        // Now move the letter outward so its bottom edge touches the ring
+        // After rotations, the letter's "bottom" (originally -Y) is now pointing toward the ring center
+        // We need to move it outward by half the letter height
         const normalX = Math.cos(angle);
         const normalY = Math.sin(angle);
         
-        // Small gap offset (0.1mm) to ensure no Z-fighting
-        const gapOffset = 0.1;
-        textGeometry.translate(normalX * gapOffset, normalY * gapOffset, 0);
+        // Move outward by half the letter height plus a tiny gap
+        const outwardOffset = (letterHeight / 2) + 0.1; // 0.1mm gap to prevent Z-fighting
+        textGeometry.translate(normalX * outwardOffset, normalY * outwardOffset, 0);
         
         letterGeometries.push(textGeometry);
         charIndex++;
