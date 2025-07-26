@@ -120,6 +120,7 @@ These 3D models are connected together to create the final 3D model:
 * Total weight:
    * Weight estimation based on volume calculation and gold's material density.
    * Weight = Volume × Material Density
+   * gold density = 19.3 g/cm³
 
 The UI would display the final 3D model. User can view the final 3D model.
 
