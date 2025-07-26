@@ -67,6 +67,16 @@ For now, some sane assumptions might be employed for curvature formulas.
 
 The 3D model of the ring is cut out at the arch which is occupied by the text 3D model. But the 3D model of the ring is properly connected to the 3D text to be a coherent 3D model without falling apart.
 
+### CSG
+
+For constructive solid geometry, the following CSG library for ThreeJS can be used:
+
+https://github.com/gkjohnson/three-bvh-csg
+
+A demo of the CSG library is available on ThreeJS official website at this page:
+
+https://threejs.org/examples/webgl_geometry_csg.html
+
 ## Precise measurements
 
 * Ring thickness/width
