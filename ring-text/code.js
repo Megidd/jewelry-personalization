@@ -191,28 +191,34 @@ function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
 
-        textGeometry.translate(-centerX, -centerY, -textDepth/2);
+        // Center the letter geometry
+        textGeometry.translate(-centerX, -centerY, 0);
 
-        // Calculate position and rotation
+        // Calculate angle for this character
         const angle = startAngle + charIndex * actualCharAngle;
-        const radius = ringOuterRadius - textDepth * 0.4;
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // Position
-        const position = new THREE.Vector3(
-            Math.sin(angle) * radius,
-            ringHeight / 2 - textSize/2,
-            Math.cos(angle) * radius
-        );
+        // First, position at origin with proper orientation
+        // The text should face outward from the ring center
         
-        // Rotation
-        const rotation = new THREE.Euler(-Math.PI/2, angle, 0);
+        // Position on the outer surface of the ring
+        // Since the ring's axis is Z, we position in the X-Y plane
+        const radius = ringOuterRadius + textDepth * 0.1; // Slightly outside the ring
         
-        // Apply transformations
-        matrix.makeRotationFromEuler(rotation);
-        matrix.setPosition(position);
+        // Position in X-Y plane (ring is along Z axis)
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        const z = 0; // Center along the ring's height
+        
+        // Create rotation to face outward from center
+        // Text should be perpendicular to the radius
+        const rotationZ = angle + Math.PI / 2; // Rotate to be tangent to the circle
+        
+        // Apply rotation first, then translation
+        matrix.makeRotationZ(rotationZ);
+        matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
