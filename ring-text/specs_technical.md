@@ -13,8 +13,6 @@ Any programming language is fine, as far as:
 
 ## Backend vs frontend
 
-There is a note that might be considered.
-
 The frontend technologies like JavaScrip and libraries like ThreeJS would offload the computational expenses on user browser. So, the server can be cheaper.
 
 The backend technologies like Python or Golang would require a more expensive server to do the 3D processing.
@@ -39,14 +37,16 @@ Therefore, JavaScript technology is preferred along with a robust library like T
 * Ring standard size
    * User would choose the ring standard size from a list.
    * The ring size should be according to a popular industry standard.
+* Text configuration
+   * Space between letters
+   * The max arch degrees on the ring occupied by the tex
+   * ...
 
 # Process
 
 ## Ring creation
 
 The logic would create a simple 3D model for the ring according to the standard size passed as input. The ring is just like a simple tube or donut or torus.
-
-A sample STL file is attached to be used as the ring, if needed.
 
 ## Text adjustment
 
@@ -56,7 +56,7 @@ A sample STL file is attached to be used as the ring, if needed.
    * So that each text letter is perpendicular to the ring radius.
    * The text should be 
 * Text 3D model is resized so that it can fit properly on the ring.
-* Text 3D model can occupy at most 90 degrees out of the 360 degrees available on the ring.
+* Text 3D model can occupy an arch in degrees available on the ring.
 
 ### Mathematical formulas for curvature
 
@@ -64,7 +64,7 @@ For now, some sane assumptions might be employed for curvature formulas.
 
 ## Ring cut
 
-The 3D model of the ring is cut at the location which is occupied by the text 3D model. But the 3D model of the ring is properly connected to the 3D text to be a coherent 3D model without falling apart.
+The 3D model of the ring is cut out at the arch which is occupied by the text 3D model. But the 3D model of the ring is properly connected to the 3D text to be a coherent 3D model without falling apart.
 
 ## Precise measurements
 
@@ -87,7 +87,7 @@ The 3D model of the ring is cut at the location which is occupied by the text 3D
 These 3D models are connected together to create the final 3D model:
 
 * Ring 3D model:
-   * Cut at the sections which are occupied by the 3D model of the text.
+   * Cut out at the arch occupied by the 3D model of the text.
 * Text 3D model:
    * Curved and resized according to the ring size and curvature.
 
@@ -105,7 +105,7 @@ The minimal UI can be a simple HTML/CSS file. The file would make use of the Jav
 
 Any data format might be picked up. Like:
 
-* Data buffers provided by the libraries employed.
+* Data buffers provided by the libraries employed. Like ThreeJS.
 * STL ASCII file format.
 * Any other data format.
 
