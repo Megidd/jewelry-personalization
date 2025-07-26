@@ -165,7 +165,9 @@ function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
     const totalAngleNeeded = charCount * adjustedCharAngle;
     const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
     const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
-    const startAngle = -totalAngle / 2;
+
+    // Add π/2 to start angle to move text from x-axis to y-axis
+    const startAngle = -totalAngle / 2 + Math.PI / 2;
 
     let charIndex = 0;
 
