@@ -21,7 +21,7 @@ The backend technologies like Python or Golang would require a more expensive se
 
 ### Preference
 
-Therefore, JavaScript technology is preferred along with a robus library like ThreeJS.
+Therefore, JavaScript technology is preferred along with a robust library like ThreeJS.
 
 # Input
 
