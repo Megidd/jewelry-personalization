@@ -52,9 +52,10 @@ The logic would create a simple 3D model for the ring according to the standard 
 
 * Text is convereted to a 3D model according to the font passed as input.
 * A curvature is applied to the text 3D model to be able to add it to the 3D model of the ring.
+   * Implementing proper curving in addition to positioning for each letter.
 * A different curvature might be applied to each letter of the text 3D model.
    * So that each text letter is perpendicular to the ring radius.
-   * The text should be 
+   * So that each text letter has proper curving in addition to positioning.
 * Text 3D model is resized so that it can fit properly on the ring.
 * Text 3D model can occupy an arch in degrees available on the ring.
 
@@ -62,7 +63,7 @@ The logic would create a simple 3D model for the ring according to the standard 
 
 For now, some sane assumptions might be employed for curvature formulas.
 
-## Ring cut
+## Ring cutout
 
 The 3D model of the ring is cut out at the arch which is occupied by the text 3D model. But the 3D model of the ring is properly connected to the 3D text to be a coherent 3D model without falling apart.
 
@@ -90,6 +91,8 @@ These 3D models are connected together to create the final 3D model:
    * Cut out at the arch occupied by the 3D model of the text.
 * Text 3D model:
    * Curved and resized according to the ring size and curvature.
+* Total weight:
+   * Eeight estimation based on volume calculation and gold's material density.
 
 The UI would display the final 3D model. User can view the final 3D model.
 
@@ -119,6 +122,10 @@ For now, the manufacturing constraints are ignored, like:
 * Metal casting constraints
 
 Currently, we just focus on aesthetics and user preference.
+
+## Witertight
+
+At the moment, it should be ensured that the final mesh is a single, watertight geometry suitable for 3D printing
 
 # Example
 
