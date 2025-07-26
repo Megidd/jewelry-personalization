@@ -14,6 +14,9 @@ const RING_SIZES = {
     '21': { innerDiameter: 20.6, outerDiameter: 23.6 }
 };
 
+// Material properties
+const GOLD_DENSITY = 19.3; // g/cm³
+
 // Initialize Three.js scene
 function init() {
     scene = new THREE.Scene();
@@ -64,24 +67,34 @@ function loadFonts() {
 
     fontNames.forEach(fontName => {
         fontLoader.load(
-            `./fonts/${fontName}.json`,  // Changed to local path
+            `./fonts/${fontName}.json`,
             (font) => {
                 fonts[fontName] = font;
                 if (Object.keys(fonts).length === fontNames.length) {
                     updateRing(); // Generate initial ring
                 }
             },
-            // Progress callback (optional)
             (xhr) => {
                 console.log(`${fontName} ${(xhr.loaded / xhr.total * 100)}% loaded`);
             },
-            // Error callback
             (error) => {
                 console.error(`Error loading ${fontName} font:`, error);
-                document.getElementById('status').textContent = `Error loading ${fontName} font`;
+                showStatus(`Error loading ${fontName} font`, 'error');
             }
         );
     });
+}
+
+// Calculate dynamic ring height based on size
+function calculateRingHeight(size) {
+    const sizeNum = parseFloat(size);
+    return 2.0 + (sizeNum - 16) * 0.08;
+}
+
+// Calculate dynamic text size based on ring size
+function calculateTextSize(ringSize) {
+    const sizeNum = parseFloat(ringSize);
+    return 1.2 + (sizeNum - 16) * 0.06;
 }
 
 // Create ring geometry
@@ -89,9 +102,9 @@ function createRing(size) {
     const ringData = RING_SIZES[size];
     const innerRadius = ringData.innerDiameter / 2;
     const outerRadius = ringData.outerDiameter / 2;
-    const height = 2.5; // Ring height in mm
+    const height = calculateRingHeight(size);
 
-    // Create ring using RingGeometry extruded
+    // Create ring using a shape with hole
     const shape = new THREE.Shape();
     
     // Outer circle
@@ -101,72 +114,65 @@ function createRing(size) {
     const hole = new THREE.Path();
     hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
     shape.holes.push(hole);
-    
+
     // Extrude settings
     const extrudeSettings = {
-        steps: 1,
+        steps: 2,
         depth: height,
-        bevelEnabled: false
+        bevelEnabled: true,
+        bevelThickness: 0.1,
+        bevelSize: 0.1,
+        bevelSegments: 2
     };
-    
+
     const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    
-    // Center the geometry
     ringGeometry.center();
-    
+
     const material = new THREE.MeshPhongMaterial({
         color: 0xFFD700,
-        metalness: 0.8,
-        roughness: 0.2
     });
 
     return new THREE.Mesh(ringGeometry, material);
 }
 
-// Create curved text - with user-controlled spacing and arc
+// Create curved text using BufferGeometry
 function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
-    const ringHeight = 2.5; // Ring height in mm
-    
-    // Create a group to hold all letters
-    const textGroup = new THREE.Group();
+    const ringHeight = calculateRingHeight(ringSize);
 
-    // Text parameters
-    const textSize = 1.5; // Slightly smaller for better fit
-    const textDepth = 0.6; // Depth of text extrusion
+    // Array to hold all letter geometries
+    const letterGeometries = [];
+    
+    // Dynamic text parameters
+    const textSize = calculateTextSize(ringSize);
+    const textDepth = textSize * 0.5;
 
     // Convert maxArc from degrees to radians
     const maxArcRadians = (maxArcDegrees * Math.PI) / 180;
-    
+
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');
     const charCount = textWithoutSpaces.length;
-    
-    if (charCount === 0) return textGroup;
 
-    // Calculate angle per character with letter spacing
-    const baseCharAngle = 0.12; // Base angle per character
+    if (charCount === 0) {
+        return new THREE.Mesh(new THREE.BufferGeometry());
+    }
+
+    // Calculate angles
+    const baseCharAngle = 0.12;
     const adjustedCharAngle = baseCharAngle * letterSpacing;
-    
-    // Calculate total angle needed for text
     const totalAngleNeeded = charCount * adjustedCharAngle;
-    
-    // Use either the needed angle or max arc, whichever is smaller
     const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
-    
-    // Calculate actual angle per character (might be compressed if hitting max arc)
     const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
     const startAngle = -totalAngle / 2;
 
-    // Track character index (excluding spaces)
     let charIndex = 0;
 
     // Create each letter
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
-        
-        if (char === ' ') continue; // Skip spaces
+        if (char === ' ') continue;
 
         const textGeometry = new THREE.TextGeometry(char, {
             font: font,
@@ -174,73 +180,158 @@ function createCurvedText(text, font, ringSize, letterSpacing, maxArcDegrees) {
             height: textDepth,
             curveSegments: 12,
             bevelEnabled: true,
-            bevelThickness: 0.05,
-            bevelSize: 0.05,
-            bevelSegments: 5
+            bevelThickness: 0.03,
+            bevelSize: 0.03,
+            bevelSegments: 3
         });
 
-        // Center the letter geometry
+        // Center the letter
         textGeometry.computeBoundingBox();
         const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
-        
-        // Important: Center in Z direction too
-        textGeometry.translate(-centerX, -centerY, 0);
 
-        const letterMesh = new THREE.Mesh(
-            textGeometry,
-            new THREE.MeshPhongMaterial({ 
-                color: 0xFFD700,
-                metalness: 0.8,
-                roughness: 0.2
-            })
-        );
+        textGeometry.translate(-centerX, -centerY, -textDepth/2);
 
-        // Calculate angle for this character
+        // Calculate position and rotation
         const angle = startAngle + charIndex * actualCharAngle;
+        const radius = ringOuterRadius - textDepth * 0.4;
 
-        // Position letter on the ring's outer surface
-        const radius = ringOuterRadius + 0.1;
+        // Create transformation matrix
+        const matrix = new THREE.Matrix4();
         
-        letterMesh.position.x = Math.sin(angle) * radius;
-        letterMesh.position.z = Math.cos(angle) * radius;
-        letterMesh.position.y = 0; 
-
-        // Rotate letter to be perpendicular to radius
-        letterMesh.rotation.z = -angle;
-
-        textGroup.add(letterMesh);
+        // Position
+        const position = new THREE.Vector3(
+            Math.sin(angle) * radius,
+            ringHeight / 2 - textSize/2,
+            Math.cos(angle) * radius
+        );
+        
+        // Rotation
+        const rotation = new THREE.Euler(-Math.PI/2, angle, 0);
+        
+        // Apply transformations
+        matrix.makeRotationFromEuler(rotation);
+        matrix.setPosition(position);
+        
+        // Apply matrix to geometry
+        textGeometry.applyMatrix4(matrix);
+        
+        letterGeometries.push(textGeometry);
         charIndex++;
     }
 
-    // Rotate the entire text group 90 degrees around X axis
-    textGroup.rotation.x = -Math.PI / 2;
-    
-    // Position the text group at the correct height on the ring
-    textGroup.position.y = ringHeight / 2 - 1.5;
+    // Merge all letter geometries
+    let mergedGeometry;
+    if (letterGeometries.length > 0) {
+        mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(letterGeometries);
+    } else {
+        mergedGeometry = new THREE.BufferGeometry();
+    }
 
-    // Adjust text depth penetration
-    textGroup.position.z = -0.2;
+    const material = new THREE.MeshPhongMaterial({
+        color: 0xFFD700,
+    });
 
-    return textGroup;
+    return new THREE.Mesh(mergedGeometry, material);
 }
 
-// Combine ring and text - simplified version
-function combineRingAndText(ring, textGroup, ringSize) {
-    // Create final combined group
-    const combinedGroup = new THREE.Group();
+// Combine ring and text into a single mesh
+function combineRingAndText(ring, textMesh) {
+    // Clone geometries to avoid modifying originals
+    const ringGeometry = ring.geometry.clone();
+    const textGeometry = textMesh.geometry.clone();
     
-    // Add ring
-    combinedGroup.add(ring.clone());
+    // Merge geometries
+    const geometries = [ringGeometry];
     
-    // Add text group
-    combinedGroup.add(textGroup);
-
-    return combinedGroup;
+    // Only add text geometry if it has vertices
+    if (textGeometry.attributes.position && textGeometry.attributes.position.count > 0) {
+        geometries.push(textGeometry);
+    }
+    
+    const mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
+    
+    const material = new THREE.MeshPhongMaterial({
+        color: 0xFFD700,
+    });
+    
+    return new THREE.Mesh(mergedGeometry, material);
 }
 
-// Update the updateRing function to use new parameters
+// Calculate volume of mesh
+function calculateVolume(mesh) {
+    const geometry = mesh.geometry;
+    
+    if (!geometry.isBufferGeometry) {
+        console.error('Geometry must be BufferGeometry');
+        return 0;
+    }
+    
+    const positions = geometry.attributes.position;
+    const indices = geometry.index;
+    let volume = 0;
+    
+    if (indices) {
+        // Indexed geometry
+        for (let i = 0; i < indices.count; i += 3) {
+            const a = indices.getX(i);
+            const b = indices.getX(i + 1);
+            const c = indices.getX(i + 2);
+            
+            const v1 = new THREE.Vector3().fromBufferAttribute(positions, a);
+            const v2 = new THREE.Vector3().fromBufferAttribute(positions, b);
+            const v3 = new THREE.Vector3().fromBufferAttribute(positions, c);
+            
+            // Calculate signed volume of tetrahedron
+            volume += v1.dot(v2.cross(v3)) / 6;
+        }
+    } else {
+        // Non-indexed geometry
+        for (let i = 0; i < positions.count; i += 3) {
+            const v1 = new THREE.Vector3().fromBufferAttribute(positions, i);
+            const v2 = new THREE.Vector3().fromBufferAttribute(positions, i + 1);
+            const v3 = new THREE.Vector3().fromBufferAttribute(positions, i + 2);
+            
+            volume += v1.dot(v2.cross(v3)) / 6;
+        }
+    }
+    
+    return Math.abs(volume);
+}
+
+// Calculate and display weight
+function calculateAndDisplayWeight(mesh) {
+    const volumeMM3 = calculateVolume(mesh);
+    const volumeCM3 = volumeMM3 / 1000;
+    const weightGrams = volumeCM3 * GOLD_DENSITY;
+
+    const weightDisplay = document.getElementById('weight-display');
+    weightDisplay.innerHTML = `
+        Estimated Weight: ${weightGrams.toFixed(2)} grams
+        <br>
+        <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+    `;
+    weightDisplay.style.display = 'block';
+}
+
+// Show status message
+function showStatus(message, type = 'normal') {
+    const statusElement = document.getElementById('status');
+    statusElement.textContent = message;
+    
+    statusElement.classList.remove('error', 'success', 'warning');
+    
+    if (type === 'error') {
+        statusElement.classList.add('error');
+    } else if (type === 'success') {
+        statusElement.classList.add('success');
+    } else if (type === 'warning') {
+        statusElement.classList.add('warning');
+    }
+}
+
+// Update the ring
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
     const fontName = document.getElementById('fontSelect').value;
@@ -249,29 +340,54 @@ function updateRing() {
     const maxArc = parseFloat(document.getElementById('maxArc').value);
 
     if (!fonts[fontName]) {
-        document.getElementById('status').textContent = 'Loading fonts...';
+        showStatus('Loading fonts...', 'normal');
         return;
     }
 
-    document.getElementById('status').textContent = 'Generating...';
+    showStatus('Generating...', 'normal');
 
     // Clear previous meshes
     if (finalMesh) {
         scene.remove(finalMesh);
+        finalMesh.geometry.dispose();
+        finalMesh.material.dispose();
     }
 
-    // Create ring
-    ringMesh = createRing(ringSize);
+    try {
+        // Create ring
+        ringMesh = createRing(ringSize);
 
-    // Create curved text with user-controlled parameters
-    const textGroup = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing, maxArc);
+        // Create curved text
+        textMesh = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing, maxArc);
 
-    // Combine ring and text
-    finalMesh = combineRingAndText(ringMesh, textGroup, ringSize);
+        // Combine ring and text into a single mesh
+        finalMesh = combineRingAndText(ringMesh, textMesh);
 
-    scene.add(finalMesh);
+        // Clean up temporary meshes
+        ringMesh.geometry.dispose();
+        textMesh.geometry.dispose();
 
-    document.getElementById('status').textContent = 'Ready';
+        scene.add(finalMesh);
+
+        // Calculate and display weight
+        calculateAndDisplayWeight(finalMesh);
+
+        showStatus('Ready', 'success');
+        
+    } catch (error) {
+        console.error('Error generating ring:', error);
+        showStatus('Error generating ring. Please try different settings.', 'error');
+        
+        // Fallback: just show ring and text separately
+        if (ringMesh && textMesh) {
+            const group = new THREE.Group();
+            group.add(ringMesh);
+            group.add(textMesh);
+            finalMesh = group;
+            scene.add(finalMesh);
+            showStatus('Generated with simplified method', 'warning');
+        }
+    }
 }
 
 // Export to STL
@@ -280,15 +396,24 @@ function exportSTL() {
         alert('Please generate a ring first');
         return;
     }
-    
-    const exporter = new THREE.STLExporter();
-    const stlString = exporter.parse(finalMesh);
-    
-    const blob = new Blob([stlString], { type: 'text/plain' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `ring_${document.getElementById('textInput').value}_${document.getElementById('ringSize').value}.stl`;
-    link.click();
+
+    showStatus('Exporting STL...', 'normal');
+
+    try {
+        const exporter = new THREE.STLExporter();
+        const stlString = exporter.parse(finalMesh);
+
+        const blob = new Blob([stlString], { type: 'text/plain' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `ring_${document.getElementById('textInput').value}_size${document.getElementById('ringSize').value}.stl`;
+        link.click();
+        
+        showStatus('STL exported successfully', 'success');
+    } catch (error) {
+        console.error('Error exporting STL:', error);
+        showStatus('Error exporting STL', 'error');
+    }
 }
 
 // Animation loop
