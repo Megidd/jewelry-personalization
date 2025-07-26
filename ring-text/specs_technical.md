@@ -119,3 +119,35 @@ For now, the manufacturing constraints are ignored, like:
 * Metal casting constraints
 
 Currently, we just focus on aesthetics and user preference.
+
+# Example
+
+## Without text
+
+Rough schematics for side view of a ring without text:
+
+```
+    .--------.
+  ,'          `.
+ /              \
+|                |
+|                |
+ \              /
+  `.          ,'
+    `--------'
+```
+
+## With text
+
+Rough schematics for side view of a ring with text:
+
+```
+    .--TEXT--.
+  ,'          `.
+ /              \
+|                |
+|                |
+ \              /
+  `.          ,'
+    `--------'
+```
