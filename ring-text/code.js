@@ -202,12 +202,10 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // First, position at origin with proper orientation
-        // The text should face outward from the ring center
-        
         // Position on the outer surface of the ring
-        // Since the ring's axis is Z, we position in the X-Y plane
-        const radius = ringOuterRadius + textDepth * 0.1; // Slightly outside the ring
+        // We want the back of the text (z = 0) to just touch the ring surface
+        // So we position at ringOuterRadius without additional offset
+        const radius = ringOuterRadius;
         
         // Position in X-Y plane (ring is along Z axis)
         const x = Math.cos(angle) * radius;
@@ -224,6 +222,15 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
+        
+        // Now we need to translate the letter outward by a small amount so the bottom touches but doesn't penetrate
+        // Since the text has been rotated, we need to move it in the direction of the normal
+        const normalX = Math.cos(angle);
+        const normalY = Math.sin(angle);
+        
+        // Move the letter slightly outward (0.05mm gap to ensure no penetration)
+        const gapOffset = 0.05;
+        textGeometry.translate(normalX * gapOffset, normalY * gapOffset, 0);
         
         letterGeometries.push(textGeometry);
         charIndex++;
