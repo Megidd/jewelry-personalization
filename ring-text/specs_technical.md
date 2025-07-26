@@ -118,7 +118,7 @@ These 3D models are connected together to create the final 3D model:
 * Text 3D model:
    * Curved and resized according to the ring size and curvature.
 * Total weight:
-   * Eeight estimation based on volume calculation and gold's material density.
+   * Weight estimation based on volume calculation and gold's material density.
    * Weight = Volume × Material Density
 
 The UI would display the final 3D model. User can view the final 3D model.
