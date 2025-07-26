@@ -192,8 +192,11 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
+        
+        // IMPORTANT: Get the depth BEFORE transformations
+        const letterDepth = bbox.max.z - bbox.min.z;
 
-        // Center the letter geometry
+        // Center the letter geometry in X and Y, but not Z
         textGeometry.translate(-centerX, -centerY, 0);
 
         // Calculate angle for this character (decreasing to go left-to-right)
@@ -202,15 +205,16 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // Position on the outer surface of the ring
-        const radius = ringOuterRadius;
+        // FIXED: Position the letter so its back face will touch the ring
+        // We need to account for the letter depth when positioning
+        const radius = ringOuterRadius + letterDepth;
         
         // Position in X-Y plane (ring is along Z axis)
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
         const z = 0; // Center along the ring's height
         
-        // FIXED: Apply rotations in correct order
+        // Apply rotations in correct order
         // First rotate 180° around X to flip the letter right-side-up
         const flipX = new THREE.Matrix4().makeRotationX(Math.PI);
         matrix.multiply(flipX);
@@ -230,12 +234,12 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
         
-        // Move the letter slightly outward
+        // Add a small gap between letter and ring
         const normalX = Math.cos(angle);
         const normalY = Math.sin(angle);
         
-        // Move the letter slightly outward (0.05mm gap to ensure no penetration)
-        const gapOffset = 0.05;
+        // Small gap offset (0.1mm) to ensure no Z-fighting
+        const gapOffset = 0.1;
         textGeometry.translate(normalX * gapOffset, normalY * gapOffset, 0);
         
         letterGeometries.push(textGeometry);
