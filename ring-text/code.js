@@ -107,22 +107,23 @@ function createRing(size) {
     // Create ring using a shape with hole
     const shape = new THREE.Shape();
     
-    // Outer circle
+    // Outer circle - increased segments from default to 64 for smoother curve
     shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
     
-    // Inner circle (hole)
+    // Inner circle (hole) - also with more segments
     const hole = new THREE.Path();
     hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
     shape.holes.push(hole);
 
-    // Extrude settings
+    // Extrude settings with more segments for smoother result
     const extrudeSettings = {
-        steps: 2,
+        steps: 4,                    // Increased from 2 to 4 for smoother extrusion
         depth: height,
         bevelEnabled: true,
         bevelThickness: 0.1,
         bevelSize: 0.1,
-        bevelSegments: 2
+        bevelSegments: 8,            // Increased from 2 to 8 for smoother bevels
+        curveSegments: 64            // Added this to make the circular shape smoother
     };
 
     const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
