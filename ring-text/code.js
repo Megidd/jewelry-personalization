@@ -97,33 +97,39 @@ function calculateTextSize(ringSize) {
     return 1.2 + (sizeNum - 16) * 0.06;
 }
 
-// Create ring geometry
-function createRing(size) {
+// Modified createRing function that accepts arc parameters
+function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
     const ringData = RING_SIZES[size];
     const innerRadius = ringData.innerDiameter / 2;
     const outerRadius = ringData.outerDiameter / 2;
     const height = calculateRingHeight(size);
 
-    // Create ring using a shape with hole
+    // Create ring shape with specified arc
     const shape = new THREE.Shape();
     
-    // Outer circle - increased segments from default to 64 for smoother curve
-    shape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
+    // Outer arc
+    shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
     
-    // Inner circle (hole) - also with more segments
-    const hole = new THREE.Path();
-    hole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
-    shape.holes.push(hole);
+    // Line to inner radius at end angle
+    const endX = Math.cos(endAngle) * innerRadius;
+    const endY = Math.sin(endAngle) * innerRadius;
+    shape.lineTo(endX, endY);
+    
+    // Inner arc (going backwards)
+    shape.absarc(0, 0, innerRadius, endAngle, startAngle, true);
+    
+    // Close the shape
+    shape.closePath();
 
-    // Extrude settings with more segments for smoother result
+    // Extrude settings
     const extrudeSettings = {
-        steps: 4,                    // Increased from 2 to 4 for smoother extrusion
+        steps: 4,
         depth: height,
         bevelEnabled: true,
         bevelThickness: 0.1,
         bevelSize: 0.1,
-        bevelSegments: 8,            // Increased from 2 to 8 for smoother bevels
-        curveSegments: 64            // Added this to make the circular shape smoother
+        bevelSegments: 8,
+        curveSegments: 64
     };
 
     const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
@@ -136,8 +142,8 @@ function createRing(size) {
     return new THREE.Mesh(ringGeometry, material);
 }
 
-// Create curved text using BufferGeometry
-function createCurvedText(text, font, ringSize, letterSpacing) {
+// Modified createCurvedText to return text data including angular span
+function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
     const ringHeight = calculateRingHeight(ringSize);
@@ -157,7 +163,12 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
     const charCount = textWithoutSpaces.length;
 
     if (charCount === 0) {
-        return new THREE.Mesh(new THREE.BufferGeometry());
+        return {
+            mesh: new THREE.Mesh(new THREE.BufferGeometry()),
+            startAngle: 0,
+            endAngle: 0,
+            totalAngle: 0
+        };
     }
 
     // Calculate angles
@@ -169,6 +180,10 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
 
     // Start from left side and go right
     const startAngle = totalAngle / 2 + Math.PI / 2;
+
+    // Track the actual angular extent of the text
+    let minAngle = startAngle;
+    let maxAngle = startAngle - totalAngle;
 
     let charIndex = 0;
 
@@ -196,7 +211,7 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         
         // Get the letter dimensions before transformation
         const letterHeight = bbox.max.y - bbox.min.y;
-        const letterDepth = bbox.max.z - bbox.min.z;
+        const letterWidth = bbox.max.x - bbox.min.x;
 
         // Center the letter geometry in X and Y, but not Z
         textGeometry.translate(-centerX, -centerY, 0);
@@ -208,42 +223,34 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         const matrix = new THREE.Matrix4();
         
         // Position at ring's outer radius
-        // The letter will be positioned so its bottom edge touches the ring
         const radius = ringOuterRadius;
         
         // Position in X-Y plane (ring is along Z axis)
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
-        const z = 0; // Center along the ring's height
+        const z = 0;
         
         // Apply rotations in correct order
-        // First rotate 180° around X to flip the letter right-side-up
         const flipX = new THREE.Matrix4().makeRotationX(Math.PI);
         matrix.multiply(flipX);
         
-        // Then rotate 180° around Y to un-mirror the letter
         const flipY = new THREE.Matrix4().makeRotationY(Math.PI);
         matrix.multiply(flipY);
         
-        // Finally rotate to face outward from the center
         const rotationZ = angle + Math.PI / 2;
         const rotZ = new THREE.Matrix4().makeRotationZ(rotationZ);
         matrix.multiply(rotZ);
         
-        // Position it
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
         textGeometry.applyMatrix4(matrix);
         
-        // Now move the letter outward so its bottom edge touches the ring
-        // After rotations, the letter's "bottom" (originally -Y) is now pointing toward the ring center
-        // We need to move it outward by half the letter height
+        // Move outward
         const normalX = Math.cos(angle);
         const normalY = Math.sin(angle);
         
-        // Move outward by half the letter height plus a tiny gap
-        const outwardOffset = (letterHeight / 2) + 0.1; // 0.1mm gap to prevent Z-fighting
+        const outwardOffset = (letterHeight / 2) + 0.1;
         textGeometry.translate(normalX * outwardOffset, normalY * outwardOffset, 0);
         
         letterGeometries.push(textGeometry);
@@ -262,7 +269,15 @@ function createCurvedText(text, font, ringSize, letterSpacing) {
         color: 0xFFD700,
     });
 
-    return new THREE.Mesh(mergedGeometry, material);
+    // Add some padding to the angular extent
+    const angularPadding = 0.1; // radians
+    
+    return {
+        mesh: new THREE.Mesh(mergedGeometry, material),
+        startAngle: minAngle + angularPadding,
+        endAngle: maxAngle - angularPadding,
+        totalAngle: totalAngle + 2 * angularPadding
+    };
 }
 
 // Combine ring and text into a single mesh
@@ -360,7 +375,7 @@ function showStatus(message, type = 'normal') {
     }
 }
 
-// Update the ring
+// Modified updateRing function
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
     const fontName = document.getElementById('fontSelect').value;
@@ -377,48 +392,70 @@ function updateRing() {
     // Clear previous meshes
     if (finalMesh) {
         scene.remove(finalMesh);
-        finalMesh.geometry.dispose();
-        finalMesh.material.dispose();
+        if (finalMesh.geometry) {
+            finalMesh.geometry.dispose();
+        }
+        if (finalMesh.material) {
+            finalMesh.material.dispose();
+        }
+        // If it's a group, dispose children
+        if (finalMesh.children) {
+            finalMesh.children.forEach(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            });
+        }
     }
 
     try {
-        // Create ring
-        ringMesh = createRing(ringSize);
+        // STEP 1: Create curved text first and get angular data
+        const textData = createCurvedTextWithData(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
+        textMesh = textData.mesh;
 
-        // Create curved text
-        textMesh = createCurvedText(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
+        // STEP 2: Calculate the arc for the ring (excluding text area)
+        // The text occupies from endAngle to startAngle (since it goes right to left)
+        // So the ring should go from startAngle to endAngle + 2π
+        const ringStartAngle = textData.startAngle;
+        const ringEndAngle = textData.endAngle + Math.PI * 2;
 
-        // Combine ring and text into a single mesh
-        finalMesh = combineRingAndText(ringMesh, textMesh);
+        // STEP 3: Create ring with gap for text
+        ringMesh = createRing(ringSize, ringStartAngle, ringEndAngle);
 
-        // Clean up temporary meshes
-        ringMesh.geometry.dispose();
-        textMesh.geometry.dispose();
-
+        // Combine ring and text
+        const group = new THREE.Group();
+        group.add(ringMesh);
+        group.add(textMesh);
+        finalMesh = group;
         scene.add(finalMesh);
 
         // Calculate and display weight
-        calculateAndDisplayWeight(finalMesh);
+        // For a group, we need to calculate volume differently
+        const ringVolume = calculateVolume(ringMesh);
+        const textVolume = calculateVolume(textMesh);
+        const totalVolume = ringVolume + textVolume;
+        
+        const volumeCM3 = totalVolume / 1000;
+        const weightGrams = volumeCM3 * GOLD_DENSITY;
+
+        const weightDisplay = document.getElementById('weight-display');
+        weightDisplay.innerHTML = `
+            Estimated Weight: ${weightGrams.toFixed(2)} grams
+            <br>
+            <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+            <br>
+            <small>Text angular span: ${(textData.totalAngle * 180 / Math.PI).toFixed(1)}°</small>
+        `;
+        weightDisplay.style.display = 'block';
 
         showStatus('Ready', 'success');
         
     } catch (error) {
         console.error('Error generating ring:', error);
         showStatus('Error generating ring. Please try different settings.', 'error');
-        
-        // Fallback: just show ring and text separately
-        if (ringMesh && textMesh) {
-            const group = new THREE.Group();
-            group.add(ringMesh);
-            group.add(textMesh);
-            finalMesh = group;
-            scene.add(finalMesh);
-            showStatus('Generated with simplified method', 'warning');
-        }
     }
 }
 
-// Export to STL
+// Modified exportSTL to handle group
 function exportSTL() {
     if (!finalMesh) {
         alert('Please generate a ring first');
@@ -429,7 +466,24 @@ function exportSTL() {
 
     try {
         const exporter = new THREE.STLExporter();
-        const stlString = exporter.parse(finalMesh);
+        
+        // If finalMesh is a group, we need to merge its children
+        let meshToExport;
+        if (finalMesh.type === 'Group') {
+            const geometries = [];
+            finalMesh.children.forEach(child => {
+                if (child.geometry) {
+                    geometries.push(child.geometry.clone());
+                }
+            });
+            
+            const mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
+            meshToExport = new THREE.Mesh(mergedGeometry, new THREE.MeshPhongMaterial());
+        } else {
+            meshToExport = finalMesh;
+        }
+        
+        const stlString = exporter.parse(meshToExport);
 
         const blob = new Blob([stlString], { type: 'text/plain' });
         const link = document.createElement('a');
@@ -438,6 +492,12 @@ function exportSTL() {
         link.click();
         
         showStatus('STL exported successfully', 'success');
+        
+        // Clean up temporary mesh if we created one
+        if (meshToExport !== finalMesh) {
+            meshToExport.geometry.dispose();
+            meshToExport.material.dispose();
+        }
     } catch (error) {
         console.error('Error exporting STL:', error);
         showStatus('Error exporting STL', 'error');
