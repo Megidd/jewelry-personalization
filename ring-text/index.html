@@ -126,6 +126,30 @@
             background: #fff3e0;
         }
         
+        /* Watermark styling */
+        .watermark {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 12px;
+            color: #666;
+            opacity: 0.7;
+            font-family: 'Arial', sans-serif;
+            z-index: 100;
+            transition: opacity 0.3s ease;
+        }
+        
+        .watermark:hover {
+            opacity: 1;
+        }
+        
+        /* Optional: Add a small logo or icon before the text */
+        .watermark::before {
+            content: "◆ ";
+            color: #FFD700;
+            font-size: 10px;
+        }
+        
         /* Responsive adjustments for smaller screens */
         @media (max-height: 600px) {
             #controls {
@@ -142,6 +166,15 @@
             #controls {
                 left: 10px;
                 max-width: calc(100vw - 20px);
+            }
+        }
+        
+        /* Responsive adjustment for watermark on mobile */
+        @media (max-width: 600px) {
+            .watermark {
+                bottom: 10px;
+                right: 10px;
+                font-size: 10px;
             }
         }
     </style>
@@ -192,6 +225,9 @@
         <div id="status">Ready</div>
         <div id="weight-display"></div>
     </div>
+
+    <!-- Watermark -->
+    <div class="watermark">Powered by JewelsPrint</div>
 
     <!-- Three.js and dependencies -->
     <script src="./libs/three.min.js"></script>
