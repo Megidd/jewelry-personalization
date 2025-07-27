@@ -3,6 +3,18 @@ let scene, camera, renderer, controls;
 let ringMesh, textMesh, finalMesh;
 let fonts = {};
 
+// Lighting objects
+let lights = {
+    ambient: null,
+    directional: null,
+    fill: null,
+    hemisphere: null,
+    spot: null
+};
+
+// Current lighting preset
+let currentLightingPreset = 'studio';
+
 // Ring dimensions based on size (in mm)
 const RING_SIZES = {
     '16': { innerDiameter: 16.5, outerDiameter: 19.5 },
@@ -25,6 +37,64 @@ const METAL_COLORS = {
     copper: 0xFF9966     // Copper
 };
 
+// Lighting presets
+const LIGHTING_PRESETS = {
+    studio: {
+        name: 'Studio',
+        ambient: { intensity: 0.8, color: 0xffffff },
+        directional: { intensity: 0.5, color: 0xffffff, position: [10, 10, 5] },
+        fill: { intensity: 0.5, color: 0xffffff, position: [-5, 5, -5] },
+        hemisphere: { intensity: 0.3, skyColor: 0xffffff, groundColor: 0x444444 },
+        toneMappingExposure: 1.5,
+        environment: 0xffffff
+    },
+    bright: {
+        name: 'Bright',
+        ambient: { intensity: 1.2, color: 0xffffff },
+        directional: { intensity: 1.5, color: 0xffffff, position: [10, 10, 5] },
+        fill: { intensity: 0.8, color: 0xffffff, position: [-5, 5, -5] },
+        hemisphere: { intensity: 0.5, skyColor: 0xffffff, groundColor: 0x666666 },
+        toneMappingExposure: 2.0,
+        environment: 0xffffff
+    },
+    soft: {
+        name: 'Soft',
+        ambient: { intensity: 0.6, color: 0xfff5e6 },
+        directional: { intensity: 0.3, color: 0xfff5e6, position: [8, 8, 8] },
+        fill: { intensity: 0.3, color: 0xfff5e6, position: [-8, 4, -8] },
+        hemisphere: { intensity: 0.2, skyColor: 0xfff5e6, groundColor: 0x333333 },
+        toneMappingExposure: 1.2,
+        environment: 0xfff5e6
+    },
+    dramatic: {
+        name: 'Dramatic',
+        ambient: { intensity: 0.2, color: 0xffffff },
+        directional: { intensity: 1.8, color: 0xffffff, position: [15, 15, 0] },
+        fill: { intensity: 0.1, color: 0x4444ff, position: [-10, 0, -10] },
+        hemisphere: { intensity: 0.1, skyColor: 0xffffff, groundColor: 0x000000 },
+        toneMappingExposure: 1.8,
+        environment: 0x222222
+    },
+    natural: {
+        name: 'Natural',
+        ambient: { intensity: 0.7, color: 0xffffcc },
+        directional: { intensity: 0.8, color: 0xffffcc, position: [12, 12, 8] },
+        fill: { intensity: 0.4, color: 0xccddff, position: [-8, 6, -6] },
+        hemisphere: { intensity: 0.4, skyColor: 0xccddff, groundColor: 0x665544 },
+        toneMappingExposure: 1.4,
+        environment: 0xeeeedd
+    },
+    warm: {
+        name: 'Warm',
+        ambient: { intensity: 0.5, color: 0xffcc99 },
+        directional: { intensity: 0.7, color: 0xffaa66, position: [10, 8, 6] },
+        fill: { intensity: 0.4, color: 0xff9966, position: [-6, 4, -8] },
+        hemisphere: { intensity: 0.3, skyColor: 0xffcc99, groundColor: 0x663333 },
+        toneMappingExposure: 1.6,
+        environment: 0xffcc99
+    }
+};
+
 // Initialize Three.js scene
 function init() {
     scene = new THREE.Scene();
@@ -43,13 +113,8 @@ function init() {
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-
-    renderer.toneMappingExposure = 1.5;
-    // Current: 1.5
-    // Darker: 0.8 - 1.2
-    // Brighter: 1.8 - 2.5
-
     renderer.outputEncoding = THREE.sRGBEncoding;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
@@ -58,44 +123,9 @@ function init() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
 
-    // Enhanced Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    //                                                     ^^^ Intensity (0.0 to ~2.0)
-    // Current: 0.8
-    // Darker: 0.4 - 0.6
-    // Brighter: 1.0 - 1.5
-
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    //                                                            ^^^ Intensity
-    // Current: 0.5
-    // Darker: 0.5 - 0.8
-    // Brighter: 1.2 - 2.0
-
-    directionalLight.position.set(10, 10, 5);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    //                                                     ^^^ Intensity
-    // Current: 0.5
-    // Darker: 0.2 - 0.4
-    // Brighter: 0.6 - 1.0
-
-    fillLight.position.set(-5, 5, -5);
-    scene.add(fillLight);
-
-    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
-    //                                                Sky color  Ground    ^^^ Intensity
-    // Current: 0.3
-    // Darker: 0.1 - 0.2
-    // Brighter: 0.4 - 0.6
-
-    scene.add(hemisphereLight);
-
-    // Simple environment color for basic reflections (no import needed)
-    scene.environment = new THREE.Color(0xffffff);
+    // Initialize lighting with default preset
+    initializeLighting();
+    applyLightingPreset('studio');
 
     // Load fonts
     loadFonts();
@@ -104,6 +134,99 @@ function init() {
     window.addEventListener('resize', onWindowResize, false);
 
     animate();
+}
+
+// Initialize lighting objects
+function initializeLighting() {
+    // Ambient light
+    lights.ambient = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(lights.ambient);
+
+    // Main directional light
+    lights.directional = new THREE.DirectionalLight(0xffffff, 0.5);
+    lights.directional.position.set(10, 10, 5);
+    lights.directional.castShadow = true;
+    lights.directional.shadow.camera.near = 0.1;
+    lights.directional.shadow.camera.far = 100;
+    lights.directional.shadow.camera.left = -30;
+    lights.directional.shadow.camera.right = 30;
+    lights.directional.shadow.camera.top = 30;
+    lights.directional.shadow.camera.bottom = -30;
+    lights.directional.shadow.mapSize.width = 2048;
+    lights.directional.shadow.mapSize.height = 2048;
+    scene.add(lights.directional);
+
+    // Fill light
+    lights.fill = new THREE.DirectionalLight(0xffffff, 0.5);
+    lights.fill.position.set(-5, 5, -5);
+    scene.add(lights.fill);
+
+    // Hemisphere light
+    lights.hemisphere = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+    scene.add(lights.hemisphere);
+
+    // Spot light (initially disabled)
+    lights.spot = new THREE.SpotLight(0xffffff, 0);
+    lights.spot.position.set(0, 20, 0);
+    lights.spot.angle = Math.PI / 6;
+    lights.spot.penumbra = 0.1;
+    lights.spot.decay = 2;
+    lights.spot.distance = 100;
+    lights.spot.castShadow = true;
+    scene.add(lights.spot);
+}
+
+// Apply lighting preset
+function applyLightingPreset(presetName) {
+    const preset = LIGHTING_PRESETS[presetName];
+    if (!preset) return;
+
+    // Update ambient light
+    lights.ambient.intensity = preset.ambient.intensity;
+    lights.ambient.color.setHex(preset.ambient.color);
+
+    // Update directional light
+    lights.directional.intensity = preset.directional.intensity;
+    lights.directional.color.setHex(preset.directional.color);
+    lights.directional.position.set(...preset.directional.position);
+
+    // Update fill light
+    lights.fill.intensity = preset.fill.intensity;
+    lights.fill.color.setHex(preset.fill.color);
+    lights.fill.position.set(...preset.fill.position);
+
+    // Update hemisphere light
+    lights.hemisphere.intensity = preset.hemisphere.intensity;
+    lights.hemisphere.color.setHex(preset.hemisphere.skyColor);
+    lights.hemisphere.groundColor.setHex(preset.hemisphere.groundColor);
+
+    // Update tone mapping
+    renderer.toneMappingExposure = preset.toneMappingExposure;
+
+    // Update environment
+    scene.environment = new THREE.Color(preset.environment);
+
+    // Special effects for certain presets
+    if (presetName === 'dramatic') {
+        lights.spot.intensity = 2.0;
+        lights.spot.color.setHex(0xffffff);
+    } else {
+        lights.spot.intensity = 0;
+    }
+
+    currentLightingPreset = presetName;
+}
+
+// Set lighting preset (called from HTML)
+function setLightingPreset(presetName) {
+    // Update UI
+    document.querySelectorAll('.lighting-preset').forEach(el => {
+        el.classList.remove('active');
+    });
+    event.target.closest('.lighting-preset').classList.add('active');
+
+    // Apply preset
+    applyLightingPreset(presetName);
 }
 
 // Load Three.js fonts

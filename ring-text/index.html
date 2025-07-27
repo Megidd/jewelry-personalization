@@ -206,6 +206,46 @@
         input[type="radio"][name="metalColor"]:checked + .color-option:hover {
             transform: scale(1.1);
         }
+
+        /* Lighting preset styles */
+        .lighting-presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .lighting-preset {
+            padding: 8px;
+            background: #f5f5f5;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .lighting-preset:hover {
+            background: #ebebeb;
+        }
+
+        .lighting-preset.active {
+            background: #FFD700;
+            border-color: #333;
+            font-weight: bold;
+        }
+
+        .lighting-preset .icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        /* Section divider */
+        .section-divider {
+            margin: 20px 0;
+            border-top: 1px solid #ddd;
+        }
         
         /* Responsive adjustments for smaller screens */
         @media (max-height: 600px) {
@@ -290,6 +330,38 @@
                 
                 <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="updateRing()">
                 <label for="colorGold" class="color-option gold" title="Gold"></label>
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="control-group">
+            <label>Lighting Preset:</label>
+            <div class="lighting-presets">
+                <div class="lighting-preset active" onclick="setLightingPreset('studio')">
+                    <div class="icon">💡</div>
+                    <div>Studio</div>
+                </div>
+                <div class="lighting-preset" onclick="setLightingPreset('bright')">
+                    <div class="icon">☀️</div>
+                    <div>Bright</div>
+                </div>
+                <div class="lighting-preset" onclick="setLightingPreset('soft')">
+                    <div class="icon">🌤️</div>
+                    <div>Soft</div>
+                </div>
+                <div class="lighting-preset" onclick="setLightingPreset('dramatic')">
+                    <div class="icon">🎭</div>
+                    <div>Dramatic</div>
+                </div>
+                <div class="lighting-preset" onclick="setLightingPreset('natural')">
+                    <div class="icon">🌿</div>
+                    <div>Natural</div>
+                </div>
+                <div class="lighting-preset" onclick="setLightingPreset('warm')">
+                    <div class="icon">🔥</div>
+                    <div>Warm</div>
+                </div>
             </div>
         </div>
 
