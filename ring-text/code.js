@@ -44,7 +44,12 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
     renderer.toneMappingExposure = 1.5;
+    // Current: 1.5
+    // Darker: 0.8 - 1.2
+    // Brighter: 1.8 - 2.5
+
     renderer.outputEncoding = THREE.sRGBEncoding;
     document.getElementById('canvas-container').appendChild(renderer.domElement);
 
@@ -55,18 +60,38 @@ function init() {
 
     // Enhanced Lighting Setup
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    //                                                     ^^^ Intensity (0.0 to ~2.0)
+    // Current: 0.8
+    // Darker: 0.4 - 0.6
+    // Brighter: 1.0 - 1.5
+
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    //                                                            ^^^ Intensity
+    // Current: 1.0
+    // Darker: 0.5 - 0.8
+    // Brighter: 1.2 - 2.0
+
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     scene.add(directionalLight);
 
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    //                                                     ^^^ Intensity
+    // Current: 0.5
+    // Darker: 0.2 - 0.4
+    // Brighter: 0.6 - 1.0
+
     fillLight.position.set(-5, 5, -5);
     scene.add(fillLight);
 
     const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+    //                                                Sky color  Ground    ^^^ Intensity
+    // Current: 0.3
+    // Darker: 0.1 - 0.2
+    // Brighter: 0.4 - 0.6
+
     scene.add(hemisphereLight);
 
     // Simple environment color for basic reflections (no import needed)
