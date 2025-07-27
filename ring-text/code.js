@@ -17,6 +17,14 @@ const RING_SIZES = {
 // Material properties
 const GOLD_DENSITY = 19.3; // g/cm³
 
+// Material colors for different metals
+const METAL_COLORS = {
+    gold: 0xFFD700,      // Classic gold
+    roseGold: 0xE8A398,  // Rose gold
+    silver: 0xC0C0C0,    // Silver
+    copper: 0xFF9966     // Copper
+};
+
 // Initialize Three.js scene
 function init() {
     scene = new THREE.Scene();
@@ -135,8 +143,11 @@ function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
     const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     ringGeometry.center();
 
+    const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
     const material = new THREE.MeshPhongMaterial({
-        color: 0xFFD700,
+        color: METAL_COLORS[selectedColor],
+        metalness: 0.8,
+        roughness: 0.2
     });
 
     return new THREE.Mesh(ringGeometry, material);
@@ -265,8 +276,11 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
         mergedGeometry = new THREE.BufferGeometry();
     }
 
+    const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
     const material = new THREE.MeshPhongMaterial({
-        color: 0xFFD700,
+        color: METAL_COLORS[selectedColor],
+        metalness: 0.8,
+        roughness: 0.2
     });
 
     // Add some padding to the angular extent
@@ -296,8 +310,11 @@ function combineRingAndText(ring, textMesh) {
     
     const mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
     
+    const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
     const material = new THREE.MeshPhongMaterial({
-        color: 0xFFD700,
+        color: METAL_COLORS[selectedColor],
+        metalness: 0.8,
+        roughness: 0.2
     });
     
     return new THREE.Mesh(mergedGeometry, material);
