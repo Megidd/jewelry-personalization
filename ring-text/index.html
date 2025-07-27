@@ -69,6 +69,11 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
+        .control-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
         input, select {
             width: 100%;
             padding: 8px;
@@ -158,11 +163,15 @@
             margin-top: 10px;
         }
 
+        .color-option-wrapper {
+            cursor: pointer;
+        }
+
         .color-option {
+            display: block;
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            cursor: pointer;
             position: relative;
             transition: all 0.3s ease;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
@@ -317,26 +326,34 @@
         </div>
 
         <div class="control-group">
-            <label for="colorSelect">Metal Color:</label>
+            <div class="control-label">Metal Color:</div>
             <div class="color-options">
-                <input type="radio" id="colorRoseGold" name="metalColor" value="roseGold" onchange="updateRing()">
-                <label for="colorRoseGold" class="color-option rose-gold" title="Rose Gold"></label>
+                <label for="colorRoseGold" class="color-option-wrapper">
+                    <input type="radio" id="colorRoseGold" name="metalColor" value="roseGold" onchange="updateRing()">
+                    <span class="color-option rose-gold" title="Rose Gold"></span>
+                </label>
                 
-                <input type="radio" id="colorSilver" name="metalColor" value="silver" onchange="updateRing()">
-                <label for="colorSilver" class="color-option silver" title="Silver"></label>
+                <label for="colorSilver" class="color-option-wrapper">
+                    <input type="radio" id="colorSilver" name="metalColor" value="silver" onchange="updateRing()">
+                    <span class="color-option silver" title="Silver"></span>
+                </label>
                 
-                <input type="radio" id="colorCopper" name="metalColor" value="copper" onchange="updateRing()">
-                <label for="colorCopper" class="color-option copper" title="Copper"></label>
+                <label for="colorCopper" class="color-option-wrapper">
+                    <input type="radio" id="colorCopper" name="metalColor" value="copper" onchange="updateRing()">
+                    <span class="color-option copper" title="Copper"></span>
+                </label>
                 
-                <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="updateRing()">
-                <label for="colorGold" class="color-option gold" title="Gold"></label>
+                <label for="colorGold" class="color-option-wrapper">
+                    <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="updateRing()">
+                    <span class="color-option gold" title="Gold"></span>
+                </label>
             </div>
         </div>
 
         <div class="section-divider"></div>
 
         <div class="control-group">
-            <label>Lighting Preset:</label>
+            <div class="control-label">Lighting Preset:</div>
             <div class="lighting-presets">
                 <div class="lighting-preset active" onclick="setLightingPreset('studio')">
                     <div class="icon">💡</div>
