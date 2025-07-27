@@ -22,12 +22,45 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             max-width: 300px;
+            max-height: calc(100vh - 40px); /* Leave 20px margin on top and bottom */
+            overflow-y: auto; /* Enable vertical scrolling when needed */
+            overflow-x: hidden;
+            /* Custom scrollbar styling for webkit browsers */
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #ddd #f5f5f5; /* Firefox */
         }
+        
+        /* Custom scrollbar for Chrome, Safari, Edge */
+        #controls::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #controls::-webkit-scrollbar-track {
+            background: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        #controls::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 4px;
+        }
+        
+        #controls::-webkit-scrollbar-thumb:hover {
+            background: #ccc;
+        }
+        
+        /* Ensure h2 doesn't have excessive margin */
+        #controls h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
         .control-group {
             margin-bottom: 15px;
         }
@@ -91,6 +124,25 @@
         .warning {
             color: #f57c00;
             background: #fff3e0;
+        }
+        
+        /* Responsive adjustments for smaller screens */
+        @media (max-height: 600px) {
+            #controls {
+                top: 10px;
+                max-height: calc(100vh - 20px);
+                padding: 15px;
+            }
+            .control-group {
+                margin-bottom: 10px;
+            }
+        }
+        
+        @media (max-width: 360px) {
+            #controls {
+                left: 10px;
+                max-width: calc(100vw - 20px);
+            }
         }
     </style>
 </head>
