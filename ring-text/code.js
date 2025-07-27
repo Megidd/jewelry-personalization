@@ -144,7 +144,7 @@ function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
     ringGeometry.center();
 
     const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
-    const material = new THREE.MeshPhongMaterial({
+    const material = new THREE.MeshStandardMaterial({
         color: METAL_COLORS[selectedColor],
         metalness: 0.8,
         roughness: 0.2
@@ -277,7 +277,7 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     }
 
     const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
-    const material = new THREE.MeshPhongMaterial({
+    const material = new THREE.MeshStandardMaterial({
         color: METAL_COLORS[selectedColor],
         metalness: 0.8,
         roughness: 0.2
@@ -311,7 +311,7 @@ function combineRingAndText(ring, textMesh) {
     const mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
     
     const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
-    const material = new THREE.MeshPhongMaterial({
+    const material = new THREE.MeshStandardMaterial({
         color: METAL_COLORS[selectedColor],
         metalness: 0.8,
         roughness: 0.2
@@ -495,7 +495,7 @@ function exportSTL() {
             });
             
             const mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(geometries);
-            meshToExport = new THREE.Mesh(mergedGeometry, new THREE.MeshPhongMaterial());
+            meshToExport = new THREE.Mesh(mergedGeometry, new THREE.MeshStandardMaterial());
         } else {
             meshToExport = finalMesh;
         }
