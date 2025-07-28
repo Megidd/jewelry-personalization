@@ -819,7 +819,7 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         // Step 2: Calculate position on the ring
         const x = Math.cos(angle) * ringMidRadius;
         const y = Math.sin(angle) * ringMidRadius;
-        const z = ringHeight / 2 + letterDepth / 2 + 0.1;
+        const z = 0;
         
         // Step 3: Create a rotation matrix that aligns the letter with the ring tangent
         // The tangent angle is perpendicular to the radius
