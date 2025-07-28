@@ -242,6 +242,10 @@ function loadFonts() {
     'Cookie_Regular',
     'Engagement_Regular',
     'Waterfall_Regular',
+    'Ballet_Regular',
+    'Birthstone_Regular',
+    'Corinthia_Bold',
+    'Corinthia_Regular',
 ];
 
     fontNames.forEach(fontName => {
