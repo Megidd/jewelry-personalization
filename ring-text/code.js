@@ -764,8 +764,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     // For sleeping text at the TOP of the ring when viewed from the side,
     // we need to position it at angle π/2 (90 degrees) in the X-Y plane
     const centerAngle = Math.PI / 2; // Top of the ring
-    const startAngle = centerAngle + totalAngle / 2; // Due to character order
-    const endAngle = centerAngle - totalAngle / 2; // Due to character order
+    const startAngle = centerAngle + totalAngle / 2;
+    const endAngle = centerAngle - totalAngle / 2;
 
     let charIndex = 0;
 
@@ -801,27 +801,46 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         textGeometry.translate(-centerX, -centerY, -centerZ);
 
         // Calculate angle for this character
-        const angle = startAngle - charIndex * actualCharAngle; // Due to character order
-
+        const angle = startAngle - charIndex * actualCharAngle;
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // First, rotate the letter to lie flat (rotate 90 degrees around X axis)
+        // IMPORTANT: The order of operations matters!
+        // We need to:
+        // 1. Rotate the letter to lie flat (around its local X axis)
+        // 2. Position it at the correct location on the ring
+        // 3. Rotate it to be tangent to the ring curve
+        
+        // Step 1: Rotate to lie flat (90 degrees around X axis)
         const rotX = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
         matrix.multiply(rotX);
         
-        // Then rotate around Z axis to follow the ring curve
-        const tangentAngle = angle - Math.PI / 2;
-        const rotZ = new THREE.Matrix4().makeRotationZ(tangentAngle);
-        matrix.multiply(rotZ);
-        
-        // Position on top of the ring
-        // Use cos and sin to position correctly at the top
+        // Step 2: Calculate position on the ring
         const x = Math.cos(angle) * ringMidRadius;
         const y = Math.sin(angle) * ringMidRadius;
-        const z = ringHeight / 2 + letterDepth / 2 + 0.1; // Position on top surface
-
+        const z = ringHeight / 2 + letterDepth / 2 + 0.1;
+        
+        // Step 3: Create a rotation matrix that aligns the letter with the ring tangent
+        // The tangent angle is perpendicular to the radius
+        const tangentAngle = angle - Math.PI / 2;
+        
+        // We need to apply this rotation AFTER positioning
+        // So we'll use a different approach: create the final transformation directly
+        
+        // Reset matrix
+        matrix.identity();
+        
+        // First, position at origin and apply the flat rotation
+        const flatRotation = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+        matrix.multiply(flatRotation);
+        
+        // Then apply the tangent rotation (around world Z axis, not local)
+        // Since the letter is now flat, we need to rotate around the axis perpendicular to the ring surface
+        const tangentRotation = new THREE.Matrix4().makeRotationZ(tangentAngle);
+        matrix.premultiply(tangentRotation); // premultiply to apply in world space
+        
+        // Finally, translate to the correct position
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
@@ -851,8 +870,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     
     return {
         mesh: new THREE.Mesh(mergedGeometry, material),
-        startAngle: endAngle - angularPadding, // Due to character order
-        endAngle: startAngle + angularPadding, // Due to character order
+        startAngle: endAngle - angularPadding,
+        endAngle: startAngle + angularPadding,
         totalAngle: totalAngle + 2 * angularPadding
     };
 }
