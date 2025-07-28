@@ -573,9 +573,55 @@ function updateRing() {
     const fontName = document.getElementById('fontSelect').value;
     const ringSize = document.getElementById('ringSize').value;
     const letterSpacing = parseFloat(document.getElementById('letterSpacing').value);
+    const textOrientation = document.querySelector('input[name="textOrientation"]:checked').value;
 
     if (!fonts[fontName]) {
         showStatus('Loading fonts...', 'normal');
+        return;
+    }
+
+    // Check if sleeping orientation is selected
+    if (textOrientation === 'sleeping') {
+        showStatus('Text sleeping on ring is not implemented yet', 'warning');
+        
+        // Clear previous meshes
+        if (finalMesh) {
+            scene.remove(finalMesh);
+            if (finalMesh.geometry) {
+                finalMesh.geometry.dispose();
+            }
+            if (finalMesh.material) {
+                finalMesh.material.dispose();
+            }
+            // If it's a group, dispose children
+            if (finalMesh.children) {
+                finalMesh.children.forEach(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+        }
+        
+        // Create a basic ring without text as placeholder
+        ringMesh = createRing(ringSize);
+        finalMesh = ringMesh;
+        scene.add(finalMesh);
+        
+        // Calculate and display weight for the ring only
+        const ringVolume = calculateVolume(ringMesh);
+        const volumeCM3 = ringVolume / 1000;
+        const weightGrams = volumeCM3 * GOLD_DENSITY;
+
+        const weightDisplay = document.getElementById('weight-display');
+        weightDisplay.innerHTML = `
+            Estimated Weight: ${weightGrams.toFixed(2)} grams
+            <br>
+            <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+            <br>
+            <small style="color: #f57c00;">Note: Text sleeping orientation coming soon!</small>
+        `;
+        weightDisplay.style.display = 'block';
+        
         return;
     }
 
@@ -646,6 +692,21 @@ function updateRing() {
         showStatus('Error generating ring. Please try different settings.', 'error');
     }
 }
+
+// TODO: Implement createCurvedTextSleeping function
+// This function should create text that lies flat on the ring surface
+// instead of standing perpendicular to it
+function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
+    // Implementation placeholder
+    // When implemented, this should:
+    // 1. Create text geometry
+    // 2. Position each letter to follow the ring curve
+    // 3. Rotate letters to lie flat on the ring surface (tangent to the curve)
+    // 4. Return mesh with proper positioning
+    
+    throw new Error('Text sleeping orientation not implemented yet');
+}
+
 
 // Modified exportSTL to handle group
 function exportSTL() {

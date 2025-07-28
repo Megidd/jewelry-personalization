@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
             font-family: Arial, sans-serif;
             overflow: hidden;
         }
+
         #canvas-container {
             position: absolute;
             top: 0;
@@ -18,6 +20,7 @@
             width: 100%;
             height: 100%;
         }
+
         #controls {
             position: absolute;
             top: 20px;
@@ -25,62 +28,71 @@
             background: rgba(255, 255, 255, 0.95);
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             max-width: 300px;
-            max-height: calc(100vh - 40px); /* Leave 20px margin on top and bottom */
-            overflow-y: auto; /* Enable vertical scrolling when needed */
+            max-height: calc(100vh - 40px);
+            /* Leave 20px margin on top and bottom */
+            overflow-y: auto;
+            /* Enable vertical scrolling when needed */
             overflow-x: hidden;
             /* Custom scrollbar styling for webkit browsers */
-            scrollbar-width: thin; /* Firefox */
-            scrollbar-color: #ddd #f5f5f5; /* Firefox */
+            scrollbar-width: thin;
+            /* Firefox */
+            scrollbar-color: #ddd #f5f5f5;
+            /* Firefox */
         }
-        
+
         /* Custom scrollbar for Chrome, Safari, Edge */
         #controls::-webkit-scrollbar {
             width: 8px;
         }
-        
+
         #controls::-webkit-scrollbar-track {
             background: #f5f5f5;
             border-radius: 4px;
         }
-        
+
         #controls::-webkit-scrollbar-thumb {
             background: #ddd;
             border-radius: 4px;
         }
-        
+
         #controls::-webkit-scrollbar-thumb:hover {
             background: #ccc;
         }
-        
+
         /* Ensure h2 doesn't have excessive margin */
         #controls h2 {
             margin-top: 0;
             margin-bottom: 20px;
             color: #333;
         }
-        
+
         .control-group {
             margin-bottom: 15px;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
         }
+
         .control-label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
         }
-        input, select {
+
+        input,
+        select {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
         }
+
         button {
             background: #FFD700;
             color: #333;
@@ -92,9 +104,11 @@
             width: 100%;
             margin-top: 5px;
         }
+
         button:hover {
             background: #FFC700;
         }
+
         #status {
             margin-top: 10px;
             padding: 10px;
@@ -103,6 +117,7 @@
             text-align: center;
             font-size: 14px;
         }
+
         #weight-display {
             margin-top: 10px;
             padding: 10px;
@@ -112,25 +127,29 @@
             font-weight: bold;
             display: none;
         }
+
         .range-value {
             display: inline-block;
             width: 50px;
             text-align: right;
             font-weight: normal;
         }
+
         .error {
             color: #d32f2f;
             background: #ffebee;
         }
+
         .success {
             color: #388e3c;
             background: #e8f5e9;
         }
+
         .warning {
             color: #f57c00;
             background: #fff3e0;
         }
-        
+
         /* Watermark styling */
         .watermark {
             position: fixed;
@@ -143,18 +162,18 @@
             z-index: 100;
             transition: opacity 0.3s ease;
         }
-        
+
         .watermark:hover {
             opacity: 1;
         }
-        
+
         /* Optional: Add a small logo or icon before the text */
         .watermark::before {
             content: "◆ ";
             color: #FFD700;
             font-size: 10px;
         }
-        
+
         /* Color selector styling */
         .color-options {
             display: flex;
@@ -174,7 +193,7 @@
             border-radius: 50%;
             position: relative;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             border: 3px solid transparent;
         }
 
@@ -201,7 +220,7 @@
         }
 
         /* Selected state */
-        input[type="radio"][name="metalColor"]:checked + .color-option {
+        input[type="radio"][name="metalColor"]:checked+.color-option {
             border-color: #333;
             transform: scale(1.1);
         }
@@ -209,10 +228,10 @@
         /* Hover effect */
         .color-option:hover {
             transform: scale(1.05);
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
         }
 
-        input[type="radio"][name="metalColor"]:checked + .color-option:hover {
+        input[type="radio"][name="metalColor"]:checked+.color-option:hover {
             transform: scale(1.1);
         }
 
@@ -255,7 +274,51 @@
             margin: 20px 0;
             border-top: 1px solid #ddd;
         }
-        
+
+        /* Text orientation styles */
+        .text-orientation-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .text-orientation-option {
+            flex: 1;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .text-orientation-option:hover {
+            background: #ebebeb;
+        }
+
+        .text-orientation-option.active {
+            background: #FFD700;
+            border-color: #333;
+            font-weight: bold;
+        }
+
+        .text-orientation-option .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .text-orientation-option .label {
+            font-size: 12px;
+        }
+
+        /* Hide radio buttons */
+        input[type="radio"][name="textOrientation"] {
+            display: none;
+        }
+
         /* Responsive adjustments for smaller screens */
         @media (max-height: 600px) {
             #controls {
@@ -263,18 +326,19 @@
                 max-height: calc(100vh - 20px);
                 padding: 15px;
             }
+
             .control-group {
                 margin-bottom: 10px;
             }
         }
-        
+
         @media (max-width: 360px) {
             #controls {
                 left: 10px;
                 max-width: calc(100vw - 20px);
             }
         }
-        
+
         /* Responsive adjustment for watermark on mobile */
         @media (max-width: 600px) {
             .watermark {
@@ -285,11 +349,12 @@
         }
     </style>
 </head>
+
 <body>
     <div id="canvas-container"></div>
     <div id="controls">
         <h2>Ring Personalizer</h2>
-        
+
         <div class="control-group">
             <label for="textInput">Text:</label>
             <input type="text" id="textInput" value="LOVE" maxlength="20" onchange="updateRing()">
@@ -318,6 +383,25 @@
         </div>
 
         <div class="control-group">
+            <div class="control-label">Text Orientation:</div>
+            <div class="text-orientation-options">
+                <label for="textStanding" class="text-orientation-option active">
+                    <input type="radio" id="textStanding" name="textOrientation" value="standing" checked
+                        onchange="updateRing()">
+                    <span class="icon">📍</span>
+                    <span class="label">Standing</span>
+                </label>
+
+                <label for="textSleeping" class="text-orientation-option">
+                    <input type="radio" id="textSleeping" name="textOrientation" value="sleeping"
+                        onchange="updateRing()">
+                    <span class="icon">💤</span>
+                    <span class="label">Sleeping</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="control-group">
             <label for="ringSize">Ring Size:</label>
             <select id="ringSize" onchange="updateRing()">
                 <option value="16">16</option>
@@ -334,8 +418,8 @@
             <label for="letterSpacing">
                 Letter Spacing: <span class="range-value" id="letterSpacingValue">1.0</span>
             </label>
-            <input type="range" id="letterSpacing" min="0.5" max="2" step="0.1" value="1" 
-                   oninput="document.getElementById('letterSpacingValue').textContent = this.value; updateRing()">
+            <input type="range" id="letterSpacing" min="0.5" max="2" step="0.1" value="1"
+                oninput="document.getElementById('letterSpacingValue').textContent = this.value; updateRing()">
         </div>
 
         <div class="control-group">
@@ -345,17 +429,17 @@
                     <input type="radio" id="colorRoseGold" name="metalColor" value="roseGold" onchange="updateRing()">
                     <span class="color-option rose-gold" title="Rose Gold"></span>
                 </label>
-                
+
                 <label for="colorSilver" class="color-option-wrapper">
                     <input type="radio" id="colorSilver" name="metalColor" value="silver" onchange="updateRing()">
                     <span class="color-option silver" title="Silver"></span>
                 </label>
-                
+
                 <label for="colorCopper" class="color-option-wrapper">
                     <input type="radio" id="colorCopper" name="metalColor" value="copper" onchange="updateRing()">
                     <span class="color-option copper" title="Copper"></span>
                 </label>
-                
+
                 <label for="colorGold" class="color-option-wrapper">
                     <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="updateRing()">
                     <span class="color-option gold" title="Gold"></span>
@@ -397,7 +481,7 @@
 
         <button onclick="updateRing()">Generate Ring</button>
         <button onclick="exportSTL()">Export STL</button>
-        
+
         <div id="status">Ready</div>
         <div id="weight-display"></div>
     </div>
@@ -410,8 +494,22 @@
     <script src="./libs/OrbitControls.js"></script>
     <script src="./libs/STLExporter.js"></script>
     <script src="./libs/BufferGeometryUtils.js"></script>
-    
+
     <!-- Main application -->
     <script src="code.js"></script>
+
+    <script>
+        // Add event listeners for text orientation radio buttons
+        document.querySelectorAll('input[name="textOrientation"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                // Update active class on labels
+                document.querySelectorAll('.text-orientation-option').forEach(option => {
+                    option.classList.remove('active');
+                });
+                this.parentElement.classList.add('active');
+            });
+        });
+    </script>
 </body>
+
 </html>
