@@ -764,8 +764,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     // For sleeping text at the TOP of the ring when viewed from the side,
     // we need to position it at angle π/2 (90 degrees) in the X-Y plane
     const centerAngle = Math.PI / 2; // Top of the ring
-    const startAngle = centerAngle - totalAngle / 2;
-    const endAngle = centerAngle + totalAngle / 2;
+    const startAngle = centerAngle + totalAngle / 2; // Due to character order
+    const endAngle = centerAngle - totalAngle / 2; // Due to character order
 
     let charIndex = 0;
 
@@ -801,7 +801,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         textGeometry.translate(-centerX, -centerY, -centerZ);
 
         // Calculate angle for this character
-        const angle = startAngle + charIndex * actualCharAngle;
+        const angle = startAngle - charIndex * actualCharAngle; // Due to character order
+
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
@@ -849,8 +850,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     
     return {
         mesh: new THREE.Mesh(mergedGeometry, material),
-        startAngle: startAngle - angularPadding,
-        endAngle: endAngle + angularPadding,
+        startAngle: endAngle - angularPadding, // Due to character order
+        endAngle: startAngle + angularPadding, // Due to character order
         totalAngle: totalAngle + 2 * angularPadding
     };
 }
