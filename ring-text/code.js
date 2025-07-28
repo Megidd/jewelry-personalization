@@ -233,14 +233,11 @@ function setLightingPreset(presetName) {
 function loadFonts() {
     const fontLoader = new THREE.FontLoader();
     const fontNames = ['Monsieur La Doulaise_Regular', 'Imperial Script_Regular', 'Miss Fajardose_Regular',
-    'Borel-Regular',
-    'ImperialScript-Regular',
-    'LeckerliOne-Regular',
-    'MeowScript-Regular',
-    'MissFajardose-Regular',
-    'MonsieurLaDoulaise-Regular',
-    'Pacifico-Regular',
-    'Yellowtail-Regular',
+    'Borel_Regular',
+    'Leckerli One_Regular',
+    'Meow Script_Regular',
+    'Pacifico_Regular',
+    'Yellowtail_Regular',
 ];
 
     fontNames.forEach(fontName => {
