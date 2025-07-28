@@ -582,7 +582,7 @@ function updateRing() {
 
     // Check if sleeping orientation is selected
     if (textOrientation === 'sleeping') {
-        showStatus('Text sleeping on ring is not implemented yet', 'warning');
+        showStatus('Generating sleeping text...', 'normal');
         
         // Clear previous meshes
         if (finalMesh) {
@@ -602,25 +602,55 @@ function updateRing() {
             }
         }
         
-        // Create a basic ring without text as placeholder
-        ringMesh = createRing(ringSize);
-        finalMesh = ringMesh;
-        scene.add(finalMesh);
-        
-        // Calculate and display weight for the ring only
-        const ringVolume = calculateVolume(ringMesh);
-        const volumeCM3 = ringVolume / 1000;
-        const weightGrams = volumeCM3 * GOLD_DENSITY;
+        try {
+            // STEP 1: Create sleeping text first and get angular data
+            const textData = createCurvedTextSleeping(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
+            textMesh = textData.mesh;
+            
+            // STEP 2: Calculate the arc for the ring (excluding text area)
+            // For sleeping text, we need to create a gap where the text sits
+            // The text occupies from startAngle to endAngle
+            // We want the ring to have a gap in this region
+            
+            // Since the sleeping text is positioned at the top (around angle 0),
+            // we need to create the ring with a gap at the top
+            const gapStart = textData.startAngle;
+            const gapEnd = textData.endAngle;
+            
+            // Create ring from gapEnd to gapStart + 2π (going the long way around)
+            ringMesh = createRing(ringSize, gapEnd, gapStart + Math.PI * 2);
+            
+            // Combine ring and text
+            const group = new THREE.Group();
+            group.add(ringMesh);
+            group.add(textMesh);
+            finalMesh = group;
+            scene.add(finalMesh);
+            
+            // Calculate and display weight
+            const ringVolume = calculateVolume(ringMesh);
+            const textVolume = calculateVolume(textMesh);
+            const totalVolume = ringVolume + textVolume;
+            
+            const volumeCM3 = totalVolume / 1000;
+            const weightGrams = volumeCM3 * GOLD_DENSITY;
 
-        const weightDisplay = document.getElementById('weight-display');
-        weightDisplay.innerHTML = `
-            Estimated Weight: ${weightGrams.toFixed(2)} grams
-            <br>
-            <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
-            <br>
-            <small style="color: #f57c00;">Note: Text sleeping orientation coming soon!</small>
-        `;
-        weightDisplay.style.display = 'block';
+            const weightDisplay = document.getElementById('weight-display');
+            weightDisplay.innerHTML = `
+                Estimated Weight: ${weightGrams.toFixed(2)} grams
+                <br>
+                <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+                <br>
+                <small>Text angular span: ${(textData.totalAngle * 180 / Math.PI).toFixed(1)}°</small>
+            `;
+            weightDisplay.style.display = 'block';
+            
+            showStatus('Ready', 'success');
+            
+        } catch (error) {
+            console.error('Error generating sleeping text:', error);
+            showStatus('Error generating sleeping text. Please try different settings.', 'error');
+        }
         
         return;
     }
@@ -693,20 +723,137 @@ function updateRing() {
     }
 }
 
-// TODO: Implement createCurvedTextSleeping function
-// This function should create text that lies flat on the ring surface
-// instead of standing perpendicular to it
+// Function to create text that lies flat on the ring surface (sleeping orientation)
 function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
-    // Implementation placeholder
-    // When implemented, this should:
-    // 1. Create text geometry
-    // 2. Position each letter to follow the ring curve
-    // 3. Rotate letters to lie flat on the ring surface (tangent to the curve)
-    // 4. Return mesh with proper positioning
-    
-    throw new Error('Text sleeping orientation not implemented yet');
-}
+    const ringData = RING_SIZES[ringSize];
+    const ringOuterRadius = ringData.outerDiameter / 2;
+    const ringInnerRadius = ringData.innerDiameter / 2;
+    const ringHeight = calculateRingHeight(ringSize);
+    const ringMidRadius = (ringOuterRadius + ringInnerRadius) / 2;
 
+    // Array to hold all letter geometries
+    const letterGeometries = [];
+    
+    // Dynamic text parameters
+    const textSize = calculateTextSize(ringSize);
+    const textDepth = 0.3; // Thinner depth for sleeping text
+
+    // Fixed max arc of 180 degrees (π radians)
+    const maxArcRadians = Math.PI;
+
+    // Remove spaces for character count
+    const textWithoutSpaces = text.replace(/ /g, '');
+    const charCount = textWithoutSpaces.length;
+
+    if (charCount === 0) {
+        return {
+            mesh: new THREE.Mesh(new THREE.BufferGeometry()),
+            startAngle: 0,
+            endAngle: 0,
+            totalAngle: 0
+        };
+    }
+
+    // Calculate angles
+    const baseCharAngle = 0.15; // Slightly larger spacing for sleeping text
+    const adjustedCharAngle = baseCharAngle * letterSpacing;
+    const totalAngleNeeded = charCount * adjustedCharAngle;
+    const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
+    const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
+
+    // For sleeping text at the TOP of the ring when viewed from the side,
+    // we need to position it at angle π/2 (90 degrees) in the X-Y plane
+    const centerAngle = Math.PI / 2; // Top of the ring
+    const startAngle = centerAngle - totalAngle / 2;
+    const endAngle = centerAngle + totalAngle / 2;
+
+    let charIndex = 0;
+
+    // Create each letter
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (char === ' ') continue;
+
+        const textGeometry = new THREE.TextGeometry(char, {
+            font: font,
+            size: textSize,
+            height: textDepth,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.02,
+            bevelSize: 0.02,
+            bevelSegments: 3
+        });
+
+        // Center the letter
+        textGeometry.computeBoundingBox();
+        const bbox = textGeometry.boundingBox;
+        const centerX = (bbox.max.x - bbox.min.x) / 2;
+        const centerY = (bbox.max.y - bbox.min.y) / 2;
+        const centerZ = (bbox.max.z - bbox.min.z) / 2;
+        
+        // Get the letter dimensions
+        const letterWidth = bbox.max.x - bbox.min.x;
+        const letterHeight = bbox.max.y - bbox.min.y;
+        const letterDepth = bbox.max.z - bbox.min.z;
+
+        // Center the letter geometry
+        textGeometry.translate(-centerX, -centerY, -centerZ);
+
+        // Calculate angle for this character
+        const angle = startAngle + charIndex * actualCharAngle;
+
+        // Create transformation matrix
+        const matrix = new THREE.Matrix4();
+        
+        // First, rotate the letter to lie flat (rotate 90 degrees around X axis)
+        const rotX = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+        matrix.multiply(rotX);
+        
+        // Then rotate around Z axis to follow the ring curve
+        const rotZ = new THREE.Matrix4().makeRotationZ(angle - Math.PI / 2); // Adjust for coordinate system
+        matrix.multiply(rotZ);
+        
+        // Position on top of the ring
+        // Use cos and sin to position correctly at the top
+        const x = Math.cos(angle) * ringMidRadius;
+        const y = Math.sin(angle) * ringMidRadius;
+        const z = ringHeight / 2 + letterDepth / 2 + 0.1; // Position on top surface
+
+        matrix.setPosition(x, y, z);
+        
+        // Apply matrix to geometry
+        textGeometry.applyMatrix4(matrix);
+        
+        letterGeometries.push(textGeometry);
+        charIndex++;
+    }
+
+    // Merge all letter geometries
+    let mergedGeometry;
+    if (letterGeometries.length > 0) {
+        mergedGeometry = THREE.BufferGeometryUtils.mergeBufferGeometries(letterGeometries);
+    } else {
+        mergedGeometry = new THREE.BufferGeometry();
+    }
+
+    const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
+    const material = new THREE.MeshStandardMaterial({
+        color: METAL_COLORS[selectedColor],
+        metalness: 0.8,
+        roughness: 0.2
+    });
+
+    // Add some padding to the angular extent
+    const angularPadding = 0.15; // radians
+    
+    return {
+        mesh: new THREE.Mesh(mergedGeometry, material),
+        startAngle: startAngle - angularPadding,
+        endAngle: endAngle + angularPadding,
+        totalAngle: totalAngle + 2 * angularPadding
+    };
+}
 
 // Modified exportSTL to handle group
 function exportSTL() {
