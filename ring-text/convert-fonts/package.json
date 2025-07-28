@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "convert-fonts": "node convert-fonts.js"
-  },
-  "devDependencies": {
-    "opentype.js": "^1.3.4"
-  }
-}
