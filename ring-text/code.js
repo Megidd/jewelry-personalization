@@ -764,8 +764,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     // For sleeping text at the TOP of the ring when viewed from the side,
     // we need to position it at angle π/2 (90 degrees) in the X-Y plane
     const centerAngle = Math.PI / 2; // Top of the ring
-    const startAngle = centerAngle + totalAngle / 2; // Due to character order
-    const endAngle = centerAngle - totalAngle / 2; // Due to character order
+    const startAngle = centerAngle + totalAngle / 2;
+    const endAngle = centerAngle - totalAngle / 2;
 
     let charIndex = 0;
 
@@ -790,37 +790,36 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
-        const centerZ = (bbox.max.z - bbox.min.z) / 2;
         
         // Get the letter dimensions
         const letterWidth = bbox.max.x - bbox.min.x;
         const letterHeight = bbox.max.y - bbox.min.y;
-        const letterDepth = bbox.max.z - bbox.min.z;
+        const letterDepth = textDepth;
 
-        // Center the letter geometry
-        textGeometry.translate(-centerX, -centerY, -centerZ);
+        // Center the letter geometry in X and Y only
+        textGeometry.translate(-centerX, -centerY, 0);
 
         // Calculate angle for this character
-        const angle = startAngle - charIndex * actualCharAngle; // Due to character order
-
+        const angle = startAngle - charIndex * actualCharAngle;
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
-        // First, rotate the letter to lie flat (rotate 90 degrees around X axis)
+        // First, rotate the letter to lie flat (rotate -90 degrees around X axis)
+        // This makes the face of the letter point upward (in +Z direction)
         const rotX = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
         matrix.multiply(rotX);
         
         // Then rotate around Z axis to follow the ring curve
-        const rotZ = new THREE.Matrix4().makeRotationZ(angle - Math.PI / 2); // Adjust for coordinate system
+        const tangentAngle = angle - Math.PI / 2;
+        const rotZ = new THREE.Matrix4().makeRotationZ(tangentAngle);
         matrix.multiply(rotZ);
         
         // Position on top of the ring
-        // Use cos and sin to position correctly at the top
         const x = Math.cos(angle) * ringMidRadius;
         const y = Math.sin(angle) * ringMidRadius;
-        const z = ringHeight / 2 + letterDepth / 2 + 0.1; // Position on top surface
-
+        const z = ringHeight / 2; // Place exactly on top surface of ring
+        
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
@@ -850,8 +849,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     
     return {
         mesh: new THREE.Mesh(mergedGeometry, material),
-        startAngle: endAngle - angularPadding, // Due to character order
-        endAngle: startAngle + angularPadding, // Due to character order
+        startAngle: endAngle - angularPadding,
+        endAngle: startAngle + angularPadding,
         totalAngle: totalAngle + 2 * angularPadding
     };
 }
