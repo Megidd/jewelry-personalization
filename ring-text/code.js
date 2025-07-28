@@ -812,7 +812,8 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         matrix.multiply(rotX);
         
         // Then rotate around Z axis to follow the ring curve
-        const rotZ = new THREE.Matrix4().makeRotationZ(angle - Math.PI / 2); // Adjust for coordinate system
+        const tangentAngle = angle - Math.PI / 2;
+        const rotZ = new THREE.Matrix4().makeRotationZ(tangentAngle);
         matrix.multiply(rotZ);
         
         // Position on top of the ring
