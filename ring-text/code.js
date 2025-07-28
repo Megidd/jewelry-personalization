@@ -238,6 +238,10 @@ function loadFonts() {
     'Meow Script_Regular',
     'Pacifico_Regular',
     'Yellowtail_Regular',
+    'Kapakana_Regular',
+    'Cookie_Regular',
+    'Engagement_Regular',
+    'Waterfall_Regular',
 ];
 
     fontNames.forEach(fontName => {
