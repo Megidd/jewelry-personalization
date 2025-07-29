@@ -450,6 +450,48 @@
         <div class="section-divider"></div>
 
         <div class="control-group">
+            <label for="textSize">
+                Text Size (mm): <span class="range-value" id="textSizeValue">2.0</span>
+            </label>
+            <input type="range" id="textSize" min="0.5" max="5" step="0.1" value="2"
+                oninput="document.getElementById('textSizeValue').textContent = this.value; debouncedUpdateRing()">
+        </div>
+
+        <div class="control-group">
+            <label for="textDepth">
+                Text Depth (mm): <span class="range-value" id="textDepthValue">1.0</span>
+            </label>
+            <input type="range" id="textDepth" min="0.2" max="3" step="0.1" value="1"
+                oninput="document.getElementById('textDepthValue').textContent = this.value; debouncedUpdateRing()">
+        </div>
+
+        <div class="control-group">
+            <label for="ringInnerRadius">
+                Ring Inner Radius (mm): <span class="range-value" id="ringInnerRadiusValue">9.5</span>
+            </label>
+            <input type="range" id="ringInnerRadius" min="6" max="15" step="0.1" value="9.5"
+                oninput="document.getElementById('ringInnerRadiusValue').textContent = this.value; debouncedUpdateRing()">
+        </div>
+
+        <div class="control-group">
+            <label for="ringThickness">
+                Ring Thickness (mm): <span class="range-value" id="ringThicknessValue">1.5</span>
+            </label>
+            <input type="range" id="ringThickness" min="0.5" max="4" step="0.1" value="1.5"
+                oninput="document.getElementById('ringThicknessValue').textContent = this.value; debouncedUpdateRing()">
+        </div>
+
+        <div class="control-group">
+            <label for="ringHeight">
+                Ring Height (mm): <span class="range-value" id="ringHeightValue">2.0</span>
+            </label>
+            <input type="range" id="ringHeight" min="1" max="5" step="0.1" value="2"
+                oninput="document.getElementById('ringHeightValue').textContent = this.value; debouncedUpdateRing()">
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="control-group">
             <div class="control-label">Lighting Preset:</div>
             <div class="lighting-presets">
                 <div class="lighting-preset active" onclick="setLightingPreset('studio')">

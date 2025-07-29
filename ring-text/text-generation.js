@@ -1,17 +1,11 @@
-// text-generation.js
-// Modified createCurvedText to return text data including angular span with proportional spacing
-function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
-    const ringData = RING_SIZES[ringSize];
-    const ringOuterRadius = ringData.outerDiameter / 2;
-    const ringHeight = calculateRingHeight(ringSize);
+function createCurvedTextWithData(text, font, customDimensions, letterSpacing) {
+    const ringOuterRadius = customDimensions.innerRadius + customDimensions.thickness;
+    const textSize = customDimensions.textSize;
+    const textDepth = customDimensions.textDepth;
 
     // Array to hold all letter geometries
     const letterGeometries = [];
     
-    // Dynamic text parameters
-    const textSize = calculateTextSize(ringSize);
-    const textDepth = textSize * 0.5;
-
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');
     const charCount = textWithoutSpaces.length;
@@ -159,20 +153,15 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     };
 }
 
-// Function to create text that lies flat on the ring surface (sleeping orientation) with proportional spacing
-function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
-    const ringData = RING_SIZES[ringSize];
-    const ringOuterRadius = ringData.outerDiameter / 2;
-    const ringInnerRadius = ringData.innerDiameter / 2;
-    const ringHeight = calculateRingHeight(ringSize);
+function createCurvedTextSleeping(text, font, customDimensions, letterSpacing) {
+    const ringOuterRadius = customDimensions.innerRadius + customDimensions.thickness;
+    const ringInnerRadius = customDimensions.innerRadius;
     const ringMidRadius = (ringOuterRadius + ringInnerRadius) / 2;
+    const textSize = customDimensions.textSize;
+    const textDepth = customDimensions.textDepth;
 
     // Array to hold all letter geometries
     const letterGeometries = [];
-    
-    // Dynamic text parameters
-    const textSize = calculateTextSize(ringSize);
-    const textDepth = 0.3; // Thinner depth for sleeping text
 
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');

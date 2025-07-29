@@ -16,6 +16,17 @@ function debouncedUpdateRing() {
     }, DEBOUNCE_DELAY);
 }
 
+// Get custom dimensions from UI
+function getCustomDimensions() {
+    return {
+        innerRadius: parseFloat(document.getElementById('ringInnerRadius').value),
+        thickness: parseFloat(document.getElementById('ringThickness').value),
+        height: parseFloat(document.getElementById('ringHeight').value),
+        textSize: parseFloat(document.getElementById('textSize').value),
+        textDepth: parseFloat(document.getElementById('textDepth').value)
+    };
+}
+
 // Modified updateRing function to handle text that goes beyond 360 degrees
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
@@ -23,6 +34,9 @@ function updateRing() {
     const ringSize = document.getElementById('ringSize').value;
     const letterSpacing = parseFloat(document.getElementById('letterSpacing').value);
     const textOrientation = document.querySelector('input[name="textOrientation"]:checked').value;
+    
+    // Get custom dimensions
+    const customDimensions = getCustomDimensions();
 
     if (!fonts[fontName]) {
         showStatus('Loading fonts...', 'normal');
@@ -53,7 +67,7 @@ function updateRing() {
         
         try {
             // STEP 1: Create sleeping text first and get angular data
-            const textData = createCurvedTextSleeping(text, fonts[fontName], ringSize, letterSpacing);
+            const textData = createCurvedTextSleeping(text, fonts[fontName], customDimensions, letterSpacing);
             textMesh = textData.mesh;
             
             // STEP 2: Calculate the arc for the ring (excluding text area)
@@ -69,7 +83,7 @@ function updateRing() {
                 showStatus('Text fills entire ring', 'warning');
             } else {
                 // Create ring from gapEnd to gapStart + 2π (going the long way around)
-                ringMesh = createRing(ringSize, gapEnd, gapStart + Math.PI * 2);
+                ringMesh = createRing(customDimensions, gapEnd, gapStart + Math.PI * 2);
                 
                 // Combine ring and text
                 const group = new THREE.Group();
@@ -131,7 +145,7 @@ function updateRing() {
 
     try {
         // STEP 1: Create curved text first and get angular data
-        const textData = createCurvedTextWithData(text, fonts[fontName], ringSize, letterSpacing);
+        const textData = createCurvedTextWithData(text, fonts[fontName], customDimensions, letterSpacing);
         textMesh = textData.mesh;
 
         // Check if text spans more than full circle
@@ -161,7 +175,7 @@ function updateRing() {
             const ringEndAngle = textData.endAngle + Math.PI * 2;
 
             // STEP 3: Create ring with gap for text
-            ringMesh = createRing(ringSize, ringStartAngle, ringEndAngle);
+            ringMesh = createRing(customDimensions, ringStartAngle, ringEndAngle);
 
             // Combine ring and text
             const group = new THREE.Group();
@@ -197,5 +211,29 @@ function updateRing() {
     }
 }
 
+// Add event listener for ring size changes to update dimension inputs
+function setupRingSizeListener() {
+    document.getElementById('ringSize').addEventListener('change', function() {
+        const ringData = RING_SIZES[this.value];
+        if (ringData) {
+            // Set inner radius based on ring size
+            const innerRadius = ringData.innerDiameter / 2;
+            document.getElementById('ringInnerRadius').value = innerRadius.toFixed(1);
+            document.getElementById('ringInnerRadiusValue').textContent = innerRadius.toFixed(1);
+            
+            // Set thickness based on ring size
+            const thickness = (ringData.outerDiameter - ringData.innerDiameter) / 2;
+            document.getElementById('ringThickness').value = thickness.toFixed(1);
+            document.getElementById('ringThicknessValue').textContent = thickness.toFixed(1);
+            
+            // Update ring
+            debouncedUpdateRing();
+        }
+    });
+}
+
 // Initialize on load
-window.addEventListener('load', init);
+window.addEventListener('load', () => {
+    init();
+    setupRingSizeListener();
+});

@@ -1,39 +1,26 @@
 // ring-geometry.js
 let ringMesh, textMesh, finalMesh;
 
-// Calculate dynamic ring height based on size
-function calculateRingHeight(size) {
-    const sizeNum = parseFloat(size);
-    return 2.0 + (sizeNum - 16) * 0.08;
-}
-
-// Calculate dynamic text size based on ring size
-function calculateTextSize(ringSize) {
-    const sizeNum = parseFloat(ringSize);
-    return 1.2 + (sizeNum - 16) * 0.06;
-}
-
-// Modified createRing function that accepts arc parameters
-function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
-    const ringData = RING_SIZES[size];
-    const innerRadius = ringData.innerDiameter / 2;
-    const outerRadius = ringData.outerDiameter / 2;
-    const height = calculateRingHeight(size);
+// Modified createRing function that uses custom dimensions
+function createRing(customDimensions, startAngle = 0, endAngle = Math.PI * 2) {
+    const innerRadius = customDimensions.innerRadius;
+    const outerRadius = customDimensions.innerRadius + customDimensions.thickness;
+    const height = customDimensions.height;
 
     // Create ring shape with specified arc
     const shape = new THREE.Shape();
-    
+
     // Outer arc
     shape.absarc(0, 0, outerRadius, startAngle, endAngle, false);
-    
+
     // Line to inner radius at end angle
     const endX = Math.cos(endAngle) * innerRadius;
     const endY = Math.sin(endAngle) * innerRadius;
     shape.lineTo(endX, endY);
-    
+
     // Inner arc (going backwards)
     shape.absarc(0, 0, innerRadius, endAngle, startAngle, true);
-    
+
     // Close the shape
     shape.closePath();
 
