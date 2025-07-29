@@ -346,7 +346,7 @@ function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
     return new THREE.Mesh(ringGeometry, material);
 }
 
-// Modified createCurvedText to return text data including angular span - NO ARC LIMIT
+// Modified createCurvedText to return text data including angular span with proportional spacing
 function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
@@ -372,27 +372,16 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
         };
     }
 
-    // Calculate angles - NO LIMIT
-    const baseCharAngle = 0.12;
-    const adjustedCharAngle = baseCharAngle * letterSpacing;
-    const totalAngle = charCount * adjustedCharAngle;
-    const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
-
-    // Start from left side and go right
-    const startAngle = totalAngle / 2 + Math.PI / 2;
-
-    // Track the actual angular extent of the text
-    let minAngle = startAngle;
-    let maxAngle = startAngle - totalAngle;
-
-    let charIndex = 0;
-
-    // Create each letter
+    // First pass: measure all characters and calculate their widths
+    const charData = [];
+    let totalWidth = 0;
+    
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
         if (char === ' ') continue;
-
-        const textGeometry = new THREE.TextGeometry(char, {
+        
+        // Create temporary geometry to measure
+        const tempGeometry = new THREE.TextGeometry(char, {
             font: font,
             size: textSize,
             height: textDepth,
@@ -402,23 +391,56 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
             bevelSize: 0.03,
             bevelSegments: 3
         });
+        
+        tempGeometry.computeBoundingBox();
+        const bbox = tempGeometry.boundingBox;
+        const width = bbox.max.x - bbox.min.x;
+        
+        charData.push({
+            char: char,
+            width: width,
+            geometry: tempGeometry,
+            bbox: bbox
+        });
+        
+        totalWidth += width;
+    }
+    
+    // Calculate spacing between characters
+    const spacingWidth = textSize * 0.2 * letterSpacing; // Adjust spacing factor as needed
+    const totalSpacingWidth = spacingWidth * Math.max(0, charCount - 1);
+    const totalArcLength = totalWidth + totalSpacingWidth;
+    
+    // Convert arc length to angle
+    // Arc length = radius * angle
+    const totalAngle = totalArcLength / ringOuterRadius;
+    
+    // Start from left side and go right
+    const startAngle = totalAngle / 2 + Math.PI / 2;
+    
+    // Track the actual angular extent of the text
+    let currentAngle = startAngle;
+    let minAngle = startAngle;
+    let maxAngle = startAngle - totalAngle;
 
+    // Second pass: position characters based on their actual widths
+    for (let i = 0; i < charData.length; i++) {
+        const data = charData[i];
+        const geometry = data.geometry;
+        const bbox = data.bbox;
+        
         // Center the letter
-        textGeometry.computeBoundingBox();
-        const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
-        
-        // Get the letter dimensions before transformation
         const letterHeight = bbox.max.y - bbox.min.y;
-        const letterWidth = bbox.max.x - bbox.min.x;
-
+        
         // Center the letter geometry in X and Y, but not Z
-        textGeometry.translate(-centerX, -centerY, 0);
-
-        // Calculate angle for this character (decreasing to go left-to-right)
-        const angle = startAngle - charIndex * actualCharAngle;
-
+        geometry.translate(-centerX, -centerY, 0);
+        
+        // Calculate angle for this specific character based on its width
+        const charWidthAngle = data.width / ringOuterRadius;
+        const charAngle = currentAngle - charWidthAngle / 2;
+        
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
         
@@ -426,8 +448,8 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
         const radius = ringOuterRadius;
         
         // Position in X-Y plane (ring is along Z axis)
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
+        const x = Math.cos(charAngle) * radius;
+        const y = Math.sin(charAngle) * radius;
         const z = 0;
         
         // Apply rotations in correct order
@@ -437,24 +459,26 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
         const flipY = new THREE.Matrix4().makeRotationY(Math.PI);
         matrix.multiply(flipY);
         
-        const rotationZ = angle + Math.PI / 2;
+        const rotationZ = charAngle + Math.PI / 2;
         const rotZ = new THREE.Matrix4().makeRotationZ(rotationZ);
         matrix.multiply(rotZ);
         
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
-        textGeometry.applyMatrix4(matrix);
+        geometry.applyMatrix4(matrix);
         
         // Move outward
-        const normalX = Math.cos(angle);
-        const normalY = Math.sin(angle);
+        const normalX = Math.cos(charAngle);
+        const normalY = Math.sin(charAngle);
         
         const outwardOffset = (letterHeight / 2) + 0.1;
-        textGeometry.translate(normalX * outwardOffset, normalY * outwardOffset, 0);
+        geometry.translate(normalX * outwardOffset, normalY * outwardOffset, 0);
         
-        letterGeometries.push(textGeometry);
-        charIndex++;
+        letterGeometries.push(geometry);
+        
+        // Update angle for next character
+        currentAngle -= charWidthAngle + (spacingWidth / ringOuterRadius);
     }
 
     // Merge all letter geometries
@@ -762,7 +786,7 @@ function updateRing() {
     }
 }
 
-// Function to create text that lies flat on the ring surface (sleeping orientation) - NO ARC LIMIT
+// Function to create text that lies flat on the ring surface (sleeping orientation) with proportional spacing
 function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
@@ -790,26 +814,16 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         };
     }
 
-    // Calculate angles - NO LIMIT
-    const baseCharAngle = 0.15; // Slightly larger spacing for sleeping text
-    const adjustedCharAngle = baseCharAngle * letterSpacing;
-    const totalAngle = charCount * adjustedCharAngle;
-    const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
-
-    // For sleeping text at the TOP of the ring when viewed from the side,
-    // we need to position it at angle π/2 (90 degrees) in the X-Y plane
-    const centerAngle = Math.PI / 2; // Top of the ring
-    const startAngle = centerAngle + totalAngle / 2;
-    const endAngle = centerAngle - totalAngle / 2;
-
-    let charIndex = 0;
-
-    // Create each letter
+    // First pass: measure all characters and calculate their widths
+    const charData = [];
+    let totalWidth = 0;
+    
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
         if (char === ' ') continue;
-
-        const textGeometry = new THREE.TextGeometry(char, {
+        
+        // Create temporary geometry to measure
+        const tempGeometry = new THREE.TextGeometry(char, {
             font: font,
             size: textSize,
             height: textDepth,
@@ -819,10 +833,43 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
             bevelSize: 0.02,
             bevelSegments: 3
         });
+        
+        tempGeometry.computeBoundingBox();
+        const bbox = tempGeometry.boundingBox;
+        const width = bbox.max.x - bbox.min.x;
+        
+        charData.push({
+            char: char,
+            width: width,
+            geometry: tempGeometry,
+            bbox: bbox
+        });
+        
+        totalWidth += width;
+    }
+    
+    // Calculate spacing between characters
+    const spacingWidth = textSize * 0.25 * letterSpacing; // Slightly larger spacing for sleeping text
+    const totalSpacingWidth = spacingWidth * Math.max(0, charCount - 1);
+    const totalArcLength = totalWidth + totalSpacingWidth;
+    
+    // Convert arc length to angle using middle radius
+    const totalAngle = totalArcLength / ringMidRadius;
+    
+    // For sleeping text at the TOP of the ring when viewed from the side
+    const centerAngle = Math.PI / 2; // Top of the ring
+    const startAngle = centerAngle + totalAngle / 2;
 
+    // Track current position
+    let currentAngle = startAngle;
+
+    // Second pass: position characters based on their actual widths
+    for (let i = 0; i < charData.length; i++) {
+        const data = charData[i];
+        const geometry = data.geometry;
+        const bbox = data.bbox;
+        
         // Center the letter
-        textGeometry.computeBoundingBox();
-        const bbox = textGeometry.boundingBox;
         const centerX = (bbox.max.x - bbox.min.x) / 2;
         const centerY = (bbox.max.y - bbox.min.y) / 2;
         const centerZ = (bbox.max.z - bbox.min.z) / 2;
@@ -833,35 +880,14 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         const letterDepth = bbox.max.z - bbox.min.z;
 
         // Center the letter geometry
-        textGeometry.translate(-centerX, -centerY, -centerZ);
+        geometry.translate(-centerX, -centerY, -centerZ);
 
-        // Calculate angle for this character
-        const angle = startAngle - charIndex * actualCharAngle;
+        // Calculate angle for this specific character based on its width
+        const charWidthAngle = data.width / ringMidRadius;
+        const charAngle = currentAngle - charWidthAngle / 2;
 
         // Create transformation matrix
         const matrix = new THREE.Matrix4();
-        
-        // IMPORTANT: The order of operations matters!
-        // We need to:
-        // 1. Rotate the letter to lie flat (around its local X axis)
-        // 2. Position it at the correct location on the ring
-        // 3. Rotate it to be tangent to the ring curve
-        
-        // Step 1: Rotate to lie flat (90 degrees around X axis)
-        const rotX = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-        matrix.multiply(rotX);
-        
-        // Step 2: Calculate position on the ring
-        const x = Math.cos(angle) * ringMidRadius;
-        const y = Math.sin(angle) * ringMidRadius;
-        const z = 0;
-        
-        // Step 3: Create a rotation matrix that aligns the letter with the ring tangent
-        // The tangent angle is perpendicular to the radius
-        const tangentAngle = angle - Math.PI / 2;
-        
-        // We need to apply this rotation AFTER positioning
-        // So we'll use a different approach: create the final transformation directly
         
         // Reset matrix
         matrix.identity();
@@ -870,19 +896,26 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         const flatRotation = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
         matrix.multiply(flatRotation);
         
-        // Then apply the tangent rotation (around world Z axis, not local)
-        // Since the letter is now flat, we need to rotate around the axis perpendicular to the ring surface
+        // Then apply the tangent rotation (around world Z axis)
+        const tangentAngle = charAngle - Math.PI / 2;
         const tangentRotation = new THREE.Matrix4().makeRotationZ(tangentAngle);
         matrix.premultiply(tangentRotation); // premultiply to apply in world space
+        
+        // Calculate position on the ring
+        const x = Math.cos(charAngle) * ringMidRadius;
+        const y = Math.sin(charAngle) * ringMidRadius;
+        const z = 0;
         
         // Finally, translate to the correct position
         matrix.setPosition(x, y, z);
         
         // Apply matrix to geometry
-        textGeometry.applyMatrix4(matrix);
+        geometry.applyMatrix4(matrix);
         
-        letterGeometries.push(textGeometry);
-        charIndex++;
+        letterGeometries.push(geometry);
+        
+        // Update angle for next character
+        currentAngle -= charWidthAngle + (spacingWidth / ringMidRadius);
     }
 
     // Merge all letter geometries
@@ -904,7 +937,7 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     const angularPadding = 0.15; // radians
     
     // Handle wrapping around if angle goes beyond 2π
-    let finalStartAngle = endAngle - angularPadding;
+    let finalStartAngle = currentAngle - angularPadding;
     let finalEndAngle = startAngle + angularPadding;
     
     return {
