@@ -3,6 +3,10 @@ let scene, camera, renderer, controls;
 let ringMesh, textMesh, finalMesh;
 let fonts = {};
 
+// Debouncing variables
+let updateTimeout;
+const DEBOUNCE_DELAY = 300; // milliseconds
+
 // Lighting objects
 let lights = {
     ambient: null,
@@ -94,6 +98,20 @@ const LIGHTING_PRESETS = {
         environment: 0xffcc99
     }
 };
+
+// Debounced update function
+function debouncedUpdateRing() {
+    // Clear any existing timeout
+    clearTimeout(updateTimeout);
+    
+    // Show that we're waiting
+    showStatus('Updating...', 'normal');
+    
+    // Set a new timeout to update after the delay
+    updateTimeout = setTimeout(() => {
+        updateRing();
+    }, DEBOUNCE_DELAY);
+}
 
 // Initialize Three.js scene
 function init() {

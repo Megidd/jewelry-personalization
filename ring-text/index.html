@@ -357,12 +357,12 @@
 
         <div class="control-group">
             <label for="textInput">Text:</label>
-            <input type="text" id="textInput" value="LOVE" maxlength="40" onchange="updateRing()">
+            <input type="text" id="textInput" value="LOVE" maxlength="40" oninput="debouncedUpdateRing()">
         </div>
 
         <div class="control-group">
             <label for="fontSelect">Font:</label>
-            <select id="fontSelect" onchange="updateRing()">
+            <select id="fontSelect" onchange="debouncedUpdateRing()">
                 <option value="Monsieur La Doulaise_Regular">Monsieur La Doulaise</option>
                 <option value="Imperial Script_Regular">Imperial Script</option>
                 <option value="Miss Fajardose_Regular">Miss Fajardose</option>
@@ -387,14 +387,14 @@
             <div class="text-orientation-options">
                 <label for="textStanding" class="text-orientation-option active">
                     <input type="radio" id="textStanding" name="textOrientation" value="standing" checked
-                        onchange="updateRing()">
+                        onchange="debouncedUpdateRing()">
                     <span class="icon">📍</span>
                     <span class="label">Standing</span>
                 </label>
 
                 <label for="textSleeping" class="text-orientation-option">
                     <input type="radio" id="textSleeping" name="textOrientation" value="sleeping"
-                        onchange="updateRing()">
+                        onchange="debouncedUpdateRing()">
                     <span class="icon">💤</span>
                     <span class="label">Sleeping</span>
                 </label>
@@ -403,7 +403,7 @@
 
         <div class="control-group">
             <label for="ringSize">Ring Size:</label>
-            <select id="ringSize" onchange="updateRing()">
+            <select id="ringSize" onchange="debouncedUpdateRing()">
                 <option value="16">16</option>
                 <option value="17">17</option>
                 <option value="18">18</option>
@@ -419,29 +419,29 @@
                 Letter Spacing: <span class="range-value" id="letterSpacingValue">1.0</span>
             </label>
             <input type="range" id="letterSpacing" min="0.5" max="2" step="0.1" value="1"
-                oninput="document.getElementById('letterSpacingValue').textContent = this.value; updateRing()">
+                oninput="document.getElementById('letterSpacingValue').textContent = this.value; debouncedUpdateRing()">
         </div>
 
         <div class="control-group">
             <div class="control-label">Metal Color:</div>
             <div class="color-options">
                 <label for="colorRoseGold" class="color-option-wrapper">
-                    <input type="radio" id="colorRoseGold" name="metalColor" value="roseGold" onchange="updateRing()">
+                    <input type="radio" id="colorRoseGold" name="metalColor" value="roseGold" onchange="debouncedUpdateRing()">
                     <span class="color-option rose-gold" title="Rose Gold"></span>
                 </label>
 
                 <label for="colorSilver" class="color-option-wrapper">
-                    <input type="radio" id="colorSilver" name="metalColor" value="silver" onchange="updateRing()">
+                    <input type="radio" id="colorSilver" name="metalColor" value="silver" onchange="debouncedUpdateRing()">
                     <span class="color-option silver" title="Silver"></span>
                 </label>
 
                 <label for="colorCopper" class="color-option-wrapper">
-                    <input type="radio" id="colorCopper" name="metalColor" value="copper" onchange="updateRing()">
+                    <input type="radio" id="colorCopper" name="metalColor" value="copper" onchange="debouncedUpdateRing()">
                     <span class="color-option copper" title="Copper"></span>
                 </label>
 
                 <label for="colorGold" class="color-option-wrapper">
-                    <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="updateRing()">
+                    <input type="radio" id="colorGold" name="metalColor" value="gold" checked onchange="debouncedUpdateRing()">
                     <span class="color-option gold" title="Gold"></span>
                 </label>
             </div>
