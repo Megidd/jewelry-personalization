@@ -600,7 +600,7 @@ function updateRing() {
         
         try {
             // STEP 1: Create sleeping text first and get angular data
-            const textData = createCurvedTextSleeping(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
+            const textData = createCurvedTextSleeping(text, fonts[fontName], ringSize, letterSpacing);
             textMesh = textData.mesh;
             
             // STEP 2: Calculate the arc for the ring (excluding text area)
@@ -678,7 +678,7 @@ function updateRing() {
 
     try {
         // STEP 1: Create curved text first and get angular data
-        const textData = createCurvedTextWithData(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
+        const textData = createCurvedTextWithData(text, fonts[fontName], ringSize, letterSpacing);
         textMesh = textData.mesh;
 
         // Check if text spans more than full circle
