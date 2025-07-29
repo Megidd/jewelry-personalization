@@ -328,7 +328,7 @@ function createRing(size, startAngle = 0, endAngle = Math.PI * 2) {
     return new THREE.Mesh(ringGeometry, material);
 }
 
-// Modified createCurvedText to return text data including angular span
+// Modified createCurvedText to return text data including angular span - NO ARC LIMIT
 function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
@@ -340,9 +340,6 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
     // Dynamic text parameters
     const textSize = calculateTextSize(ringSize);
     const textDepth = textSize * 0.5;
-
-    // Fixed max arc of 180 degrees (π radians)
-    const maxArcRadians = Math.PI;
 
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');
@@ -357,11 +354,10 @@ function createCurvedTextWithData(text, font, ringSize, letterSpacing) {
         };
     }
 
-    // Calculate angles
+    // Calculate angles - NO LIMIT
     const baseCharAngle = 0.12;
     const adjustedCharAngle = baseCharAngle * letterSpacing;
-    const totalAngleNeeded = charCount * adjustedCharAngle;
-    const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
+    const totalAngle = charCount * adjustedCharAngle;
     const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
 
     // Start from left side and go right
@@ -567,7 +563,7 @@ function showStatus(message, type = 'normal') {
     }
 }
 
-// Modified updateRing function
+// Modified updateRing function to handle text that goes beyond 360 degrees
 function updateRing() {
     const text = document.getElementById('textInput').value || 'LOVE';
     const fontName = document.getElementById('fontSelect').value;
@@ -608,29 +604,34 @@ function updateRing() {
             textMesh = textData.mesh;
             
             // STEP 2: Calculate the arc for the ring (excluding text area)
-            // For sleeping text, we need to create a gap where the text sits
-            // The text occupies from startAngle to endAngle
-            // We want the ring to have a gap in this region
-            
-            // Since the sleeping text is positioned at the top (around angle 0),
-            // we need to create the ring with a gap at the top
             const gapStart = textData.startAngle;
             const gapEnd = textData.endAngle;
             
-            // Create ring from gapEnd to gapStart + 2π (going the long way around)
-            ringMesh = createRing(ringSize, gapEnd, gapStart + Math.PI * 2);
-            
-            // Combine ring and text
-            const group = new THREE.Group();
-            group.add(ringMesh);
-            group.add(textMesh);
-            finalMesh = group;
-            scene.add(finalMesh);
+            // Check if text spans more than full circle
+            if (textData.totalAngle >= Math.PI * 2) {
+                // Text fills entire ring, no ring to show
+                finalMesh = textMesh;
+                scene.add(finalMesh);
+                
+                showStatus('Text fills entire ring', 'warning');
+            } else {
+                // Create ring from gapEnd to gapStart + 2π (going the long way around)
+                ringMesh = createRing(ringSize, gapEnd, gapStart + Math.PI * 2);
+                
+                // Combine ring and text
+                const group = new THREE.Group();
+                group.add(ringMesh);
+                group.add(textMesh);
+                finalMesh = group;
+                scene.add(finalMesh);
+            }
             
             // Calculate and display weight
-            const ringVolume = calculateVolume(ringMesh);
-            const textVolume = calculateVolume(textMesh);
-            const totalVolume = ringVolume + textVolume;
+            let totalVolume = 0;
+            if (ringMesh) {
+                totalVolume += calculateVolume(ringMesh);
+            }
+            totalVolume += calculateVolume(textMesh);
             
             const volumeCM3 = totalVolume / 1000;
             const weightGrams = volumeCM3 * GOLD_DENSITY;
@@ -680,42 +681,62 @@ function updateRing() {
         const textData = createCurvedTextWithData(text.toUpperCase(), fonts[fontName], ringSize, letterSpacing);
         textMesh = textData.mesh;
 
-        // STEP 2: Calculate the arc for the ring (excluding text area)
-        // The text occupies from endAngle to startAngle (since it goes right to left)
-        // So the ring should go from startAngle to endAngle + 2π
-        const ringStartAngle = textData.startAngle;
-        const ringEndAngle = textData.endAngle + Math.PI * 2;
+        // Check if text spans more than full circle
+        if (textData.totalAngle >= Math.PI * 2) {
+            // Text fills entire ring, no ring to show
+            finalMesh = textMesh;
+            scene.add(finalMesh);
+            
+            showStatus('Text fills entire ring', 'warning');
+            
+            const textVolume = calculateVolume(textMesh);
+            const volumeCM3 = textVolume / 1000;
+            const weightGrams = volumeCM3 * GOLD_DENSITY;
 
-        // STEP 3: Create ring with gap for text
-        ringMesh = createRing(ringSize, ringStartAngle, ringEndAngle);
+            const weightDisplay = document.getElementById('weight-display');
+            weightDisplay.innerHTML = `
+                Estimated Weight: ${weightGrams.toFixed(2)} grams
+                <br>
+                <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+                <br>
+                <small>Text angular span: ${(textData.totalAngle * 180 / Math.PI).toFixed(1)}°</small>
+            `;
+            weightDisplay.style.display = 'block';
+        } else {
+            // STEP 2: Calculate the arc for the ring (excluding text area)
+            const ringStartAngle = textData.startAngle;
+            const ringEndAngle = textData.endAngle + Math.PI * 2;
 
-        // Combine ring and text
-        const group = new THREE.Group();
-        group.add(ringMesh);
-        group.add(textMesh);
-        finalMesh = group;
-        scene.add(finalMesh);
+            // STEP 3: Create ring with gap for text
+            ringMesh = createRing(ringSize, ringStartAngle, ringEndAngle);
 
-        // Calculate and display weight
-        // For a group, we need to calculate volume differently
-        const ringVolume = calculateVolume(ringMesh);
-        const textVolume = calculateVolume(textMesh);
-        const totalVolume = ringVolume + textVolume;
-        
-        const volumeCM3 = totalVolume / 1000;
-        const weightGrams = volumeCM3 * GOLD_DENSITY;
+            // Combine ring and text
+            const group = new THREE.Group();
+            group.add(ringMesh);
+            group.add(textMesh);
+            finalMesh = group;
+            scene.add(finalMesh);
 
-        const weightDisplay = document.getElementById('weight-display');
-        weightDisplay.innerHTML = `
-            Estimated Weight: ${weightGrams.toFixed(2)} grams
-            <br>
-            <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
-            <br>
-            <small>Text angular span: ${(textData.totalAngle * 180 / Math.PI).toFixed(1)}°</small>
-        `;
-        weightDisplay.style.display = 'block';
+            // Calculate and display weight
+            const ringVolume = calculateVolume(ringMesh);
+            const textVolume = calculateVolume(textMesh);
+            const totalVolume = ringVolume + textVolume;
+            
+            const volumeCM3 = totalVolume / 1000;
+            const weightGrams = volumeCM3 * GOLD_DENSITY;
 
-        showStatus('Ready', 'success');
+            const weightDisplay = document.getElementById('weight-display');
+            weightDisplay.innerHTML = `
+                Estimated Weight: ${weightGrams.toFixed(2)} grams
+                <br>
+                <small>Volume: ${volumeCM3.toFixed(3)} cm³</small>
+                <br>
+                <small>Text angular span: ${(textData.totalAngle * 180 / Math.PI).toFixed(1)}°</small>
+            `;
+            weightDisplay.style.display = 'block';
+
+            showStatus('Ready', 'success');
+        }
         
     } catch (error) {
         console.error('Error generating ring:', error);
@@ -723,7 +744,7 @@ function updateRing() {
     }
 }
 
-// Function to create text that lies flat on the ring surface (sleeping orientation)
+// Function to create text that lies flat on the ring surface (sleeping orientation) - NO ARC LIMIT
 function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     const ringData = RING_SIZES[ringSize];
     const ringOuterRadius = ringData.outerDiameter / 2;
@@ -738,9 +759,6 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     const textSize = calculateTextSize(ringSize);
     const textDepth = 0.3; // Thinner depth for sleeping text
 
-    // Fixed max arc of 180 degrees (π radians)
-    const maxArcRadians = Math.PI;
-
     // Remove spaces for character count
     const textWithoutSpaces = text.replace(/ /g, '');
     const charCount = textWithoutSpaces.length;
@@ -754,11 +772,10 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
         };
     }
 
-    // Calculate angles
+    // Calculate angles - NO LIMIT
     const baseCharAngle = 0.15; // Slightly larger spacing for sleeping text
     const adjustedCharAngle = baseCharAngle * letterSpacing;
-    const totalAngleNeeded = charCount * adjustedCharAngle;
-    const totalAngle = Math.min(totalAngleNeeded, maxArcRadians);
+    const totalAngle = charCount * adjustedCharAngle;
     const actualCharAngle = charCount > 1 ? totalAngle / (charCount - 1) : 0;
 
     // For sleeping text at the TOP of the ring when viewed from the side,
@@ -868,10 +885,14 @@ function createCurvedTextSleeping(text, font, ringSize, letterSpacing) {
     // Add some padding to the angular extent
     const angularPadding = 0.15; // radians
     
+    // Handle wrapping around if angle goes beyond 2π
+    let finalStartAngle = endAngle - angularPadding;
+    let finalEndAngle = startAngle + angularPadding;
+    
     return {
         mesh: new THREE.Mesh(mergedGeometry, material),
-        startAngle: endAngle - angularPadding,
-        endAngle: startAngle + angularPadding,
+        startAngle: finalStartAngle,
+        endAngle: finalEndAngle,
         totalAngle: totalAngle + 2 * angularPadding
     };
 }
