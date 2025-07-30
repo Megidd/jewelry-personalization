@@ -37,7 +37,6 @@ function createRing(customDimensions, startAngle = 0, endAngle = Math.PI * 2) {
     };
 
     const ringGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    ringGeometry.center();
 
     const selectedColor = document.querySelector('input[name="metalColor"]:checked').value;
     const material = new THREE.MeshStandardMaterial({
