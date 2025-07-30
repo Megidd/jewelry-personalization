@@ -1,3 +1,5 @@
+// text-generation.js
+
 function createCurvedTextWithData(text, font, customDimensions, letterSpacing) {
     const ringOuterRadius = customDimensions.innerRadius + customDimensions.thickness;
     const textSize = customDimensions.textSize;

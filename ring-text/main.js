@@ -1,4 +1,5 @@
 // main.js
+
 // Debouncing variables
 let updateTimeout;
 
