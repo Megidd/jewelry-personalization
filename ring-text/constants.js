@@ -1,4 +1,5 @@
 // constants.js
+
 // Ring dimensions based on size (in mm)
 const RING_SIZES = {
     '16': { innerDiameter: 16.5, outerDiameter: 19.5 },

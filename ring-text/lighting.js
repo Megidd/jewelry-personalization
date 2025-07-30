@@ -1,4 +1,5 @@
 // lighting.js
+
 // Lighting objects
 let lights = {
     ambient: null,

@@ -1,4 +1,5 @@
 // scene-setup.js
+
 let scene, camera, renderer, controls;
 
 // Initialize Three.js scene

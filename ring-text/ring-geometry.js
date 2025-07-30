@@ -1,4 +1,5 @@
 // ring-geometry.js
+
 let ringMesh, textMesh, finalMesh;
 
 // Modified createRing function that uses custom dimensions
