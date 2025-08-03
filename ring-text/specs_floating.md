@@ -1,4 +1,4 @@
-Is the following probelm and solution clear?  If anything is needed, please let me know to provide. Thanks.
+Is the following problem and solution clear?  If anything is needed, please let me know to provide. Thanks.
 
 # Problem
 
