@@ -42,3 +42,12 @@ Options are:
    * Base platform or decorative bridges - they might look natural and might provide good support.
 * For Sleeping Text:
    * Organic flow connections might work best as they can follow the ring’s curve naturally.
+
+## Simplest while the most elegant
+
+Maybe the simplest and the most elegant solution is:
+
+* Connecting each text character to the next character by a wire-like link
+* Connecting ring to the first character by a wire-like link
+* Connecting ring to the last character by a wire-like link
+* The link dimensiones should be such that 3D printing and metal casting would be convenient
