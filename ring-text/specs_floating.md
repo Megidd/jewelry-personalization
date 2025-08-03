@@ -2,7 +2,7 @@ Is the following problem and solution clear?  If anything is needed, please let 
 
 # Problem
 
-A 3D ring is created with a 3D text on it. The text characters are floating on air. So, they cannot be manufactured by 3D printing and metal casting. 
+A 3D ring is created with 3D text on it. The text characters are floating in the air. So, they cannot be manufactured by 3D printing and later metal casting. 
 
 Simple ideas are required to elegantly connect the text characters to each other or to the ring itself. To be able to manufacture them by 3D printing and metal casting.
 
@@ -48,6 +48,6 @@ Options are:
 Maybe the simplest and the most elegant solution is:
 
 * Connecting each text character to the next character by a wire-like link
-* Connecting ring to the first character by a wire-like link
-* Connecting ring to the last character by a wire-like link
-* The link dimensiones should be such that 3D printing and metal casting would be convenient
+* Connecting the ring to the first character by a wire-like link
+* Connecting the ring to the last character by a wire-like link
+* The link dimensions should be such that 3D printing and metal casting would be convenient
