@@ -24,6 +24,6 @@ Options are:
 ## Tips
 
 * For Standing Text:
-   * Base platform or decorative bridges - they look natural and provide good support.
+   * Base platform or decorative bridges - they might look natural and might provide good support.
 * For Sleeping Text:
    * Organic flow connections might work best as they can follow the ring’s curve naturally.
