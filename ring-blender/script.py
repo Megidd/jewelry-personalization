@@ -116,9 +116,28 @@ def add_materials(ring, text):
     ring.data.materials.append(ring_mat)
     text.data.materials.append(text_mat)
 
-def export_result(filepath="ring_with_text.obj"):
+def export_result(filepath="ring_with_text.stl"):
     """Export the final result"""
-    bpy.ops.wm.obj_export(filepath=filepath, export_selected_objects=False)
+    # For Blender 3.0+
+    try:
+        bpy.ops.wm.stl_export(filepath=filepath,
+                              export_selected_objects=False,
+                              ascii_format=False,
+                              apply_modifiers=True)
+    except AttributeError:
+        # For Blender 2.8x - 2.9x
+        try:
+            bpy.ops.export_mesh.stl(filepath=filepath,
+                                    use_selection=False,
+                                    use_mesh_modifiers=True,
+                                    ascii=False)
+        except AttributeError:
+            # For older versions or as a fallback
+            bpy.ops.export_scene.stl(filepath=filepath,
+                                     use_selection=False,
+                                     use_mesh_modifiers=True,
+                                     ascii=False)
+
     print(f"Exported to {filepath}")
 
 def create_ring_with_text(
@@ -129,7 +148,7 @@ def create_ring_with_text(
     font_size=0.3,
     text_extrude=0.1,
     font_path=None,
-    output_path="ring_with_text.obj"
+    output_path="ring_with_text.stl"
 ):
     """
     Main function to create a ring with custom text
@@ -193,7 +212,7 @@ if __name__ == "__main__":
         font_size=0.3,
         text_extrude=0.1,
         font_path=None,  # Set to path like "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
-        output_path="custom_ring.obj"
+        output_path="custom_ring.stl"
     )
     
     print("Ring with text created successfully!")
