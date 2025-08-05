@@ -1,5 +1,7 @@
 import bpy
-import math
+import json
+import sys
+import os
 
 def clear_scene():
     """Remove all objects from the scene"""
@@ -196,23 +198,32 @@ def create_ring_with_text(
     
     return ring, text_obj
 
-# Example usage - this will run when executed from command line
-if __name__ == "__main__":
-    import sys
+def create_customizable_ring_from_config(config_file):
+    """Load configuration from JSON and create ring"""
     
-    # Parse command line arguments if provided
-    text = sys.argv[-1] if len(sys.argv) > 1 else "CUSTOM RING"
+    with open(config_file, 'r') as f:
+        config = json.load(f)
     
-    # Create the ring with text
+    # Extract parameters
+    text_config = config.get('text', {})
+    ring_config = config.get('ring', {})
+    export_config = config.get('export', {})
+    
+    # Create the ring with text using configuration
     create_ring_with_text(
-        text=text,
-        inner_radius=2.0,
-        outer_radius=2.5,
-        ring_height=0.5,
-        font_size=0.3,
-        text_extrude=0.1,
-        font_path=None,  # Set to path like "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf"
-        output_path="custom_ring.stl"
+        text=text_config.get('content', 'CUSTOM RING'),
+        inner_radius=ring_config.get('inner_radius', 2.0),
+        outer_radius=ring_config.get('outer_radius', 2.5),
+        ring_height=ring_config.get('height', 0.5),
+        font_size=text_config.get('size', 0.3),
+        text_extrude=text_config.get('extrude', 0.1),
+        font_path=text_config.get('font_path'),
+        output_path=export_config.get('output_path', 'ring.stl')
     )
-    
-    print("Ring with text created successfully!")
+
+# Usage with config file
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        config_path = sys.argv[-1]
+        if os.path.exists(config_path) and config_path.endswith('.json'):
+            create_customizable_ring_from_config(config_path)
