@@ -1,1 +1,1 @@
-blender --background --python script.py config.json
+blender --background --python script.py -- config.json
