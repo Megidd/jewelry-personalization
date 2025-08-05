@@ -3,7 +3,9 @@
         "content": "FOREVER YOURS",
         "size": 0.35,
         "extrude": 0.12,
-        "font_path": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf"
+        "font_path": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf",
+        "letter_spacing": 0.2,
+        "use_individual_letters": false
     },
     "ring": {
         "inner_radius": 1.8,

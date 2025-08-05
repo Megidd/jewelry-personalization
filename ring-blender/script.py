@@ -2,6 +2,7 @@ import bpy
 import json
 import sys
 import os
+import math
 
 def clear_scene():
     """Remove all objects from the scene"""
@@ -53,8 +54,90 @@ def create_ring(inner_radius=2.0, outer_radius=2.5, height=0.5):
     
     return outer_cylinder
 
-def create_curved_text(text="CUSTOM TEXT", radius=2.25, font_size=0.3, extrude_depth=0.1, font_path=None):
-    """Create 3D text that curves around the ring"""
+def create_curved_text(text="CUSTOM TEXT", radius=2.25, font_size=0.3, extrude_depth=0.1, font_path=None, letter_spacing=0.1):
+    """Create 3D text that curves around the ring with adjustable letter spacing"""
+    
+    # Create a parent empty for all text letters
+    text_parent = bpy.data.objects.new("TextParent", None)
+    bpy.context.collection.objects.link(text_parent)
+    
+    # Calculate the total arc length needed for the text
+    # This is approximate - you may need to adjust based on font
+    base_letter_width = font_size * 0.6  # Approximate letter width
+    total_width = len(text) * base_letter_width + (len(text) - 1) * letter_spacing
+    
+    # Calculate angle per unit length
+    angle_per_unit = 360.0 / (2 * math.pi * radius)
+    
+    # Calculate total angle needed for text
+    total_angle = total_width * angle_per_unit
+    
+    # Starting angle (center the text)
+    start_angle = -total_angle / 2
+    
+    # Create individual letters
+    current_angle = start_angle
+    all_letters = []
+    
+    for i, char in enumerate(text):
+        if char == ' ':
+            # Skip space but add to angle
+            current_angle += (base_letter_width + letter_spacing) * angle_per_unit
+            continue
+            
+        # Create text object for single character
+        char_curve = bpy.data.curves.new(name=f"Char_{i}", type='FONT')
+        char_obj = bpy.data.objects.new(name=f"Char_{i}", object_data=char_curve)
+        bpy.context.collection.objects.link(char_obj)
+        
+        # Set text properties
+        char_curve.body = char
+        char_curve.size = font_size
+        char_curve.extrude = extrude_depth
+        char_curve.bevel_depth = 0.02
+        char_curve.bevel_resolution = 2
+        char_curve.align_x = 'CENTER'
+        char_curve.align_y = 'CENTER'
+        
+        # Load custom font if provided
+        if font_path:
+            try:
+                font = bpy.data.fonts.load(font_path)
+                char_curve.font = font
+            except:
+                print(f"Could not load font from {font_path}, using default")
+        
+        # Position the character
+        angle_rad = math.radians(current_angle)
+        x = radius * math.cos(angle_rad)
+        y = radius * math.sin(angle_rad)
+        
+        char_obj.location = (x, y, 0.25)
+        
+        # Rotate to face outward from center
+        char_obj.rotation_euler = (0, 0, angle_rad - math.pi/2)
+        
+        # Parent to the text parent
+        char_obj.parent = text_parent
+        
+        all_letters.append(char_obj)
+        
+        # Calculate approximate width of this character
+        # This is simplified - for better results, you'd measure the actual character width
+        if char.upper() in ['I', 'J', 'L']:
+            char_width = base_letter_width * 0.5
+        elif char.upper() in ['M', 'W']:
+            char_width = base_letter_width * 1.5
+        else:
+            char_width = base_letter_width
+            
+        # Move to next character position
+        current_angle += (char_width + letter_spacing) * angle_per_unit
+    
+    return text_parent, all_letters
+
+def create_curved_text_single_object(text="CUSTOM TEXT", radius=2.25, font_size=0.3, extrude_depth=0.1, font_path=None, letter_spacing=0.1):
+    """Alternative method: Create 3D text as a single object with letter spacing"""
     
     # Create text object
     text_curve = bpy.data.curves.new(name="RingText", type='FONT')
@@ -67,6 +150,10 @@ def create_curved_text(text="CUSTOM TEXT", radius=2.25, font_size=0.3, extrude_d
     text_curve.extrude = extrude_depth
     text_curve.bevel_depth = 0.02
     text_curve.bevel_resolution = 2
+    
+    # Set letter spacing
+    text_curve.space_character = 1.0 + letter_spacing / font_size
+    text_curve.space_word = 1.0 + letter_spacing / font_size
     
     # Load custom font if provided
     if font_path:
@@ -98,7 +185,7 @@ def create_curved_text(text="CUSTOM TEXT", radius=2.25, font_size=0.3, extrude_d
     
     return text_obj, curve_circle
 
-def add_materials(ring, text):
+def add_materials(ring, text_objects):
     """Add materials to ring and text"""
     
     # Create ring material
@@ -116,7 +203,15 @@ def add_materials(ring, text):
     
     # Assign materials
     ring.data.materials.append(ring_mat)
-    text.data.materials.append(text_mat)
+    
+    # Handle both single text object and multiple letter objects
+    if isinstance(text_objects, list):
+        for text_obj in text_objects:
+            if hasattr(text_obj, 'data') and hasattr(text_obj.data, 'materials'):
+                text_obj.data.materials.append(text_mat)
+    else:
+        if hasattr(text_objects, 'data') and hasattr(text_objects.data, 'materials'):
+            text_objects.data.materials.append(text_mat)
 
 def export_result(filepath="ring_with_text.stl"):
     """Export the final result"""
@@ -150,7 +245,9 @@ def create_ring_with_text(
     font_size=0.3,
     text_extrude=0.1,
     font_path=None,
-    output_path="ring_with_text.stl"
+    letter_spacing=0.1,
+    output_path="ring_with_text.stl",
+    use_individual_letters=False
 ):
     """
     Main function to create a ring with custom text
@@ -171,8 +268,12 @@ def create_ring_with_text(
         Extrusion depth of the text
     font_path : str
         Path to custom font file (optional)
+    letter_spacing : float
+        Distance between letters
     output_path : str
         Path for the exported file
+    use_individual_letters : bool
+        If True, create each letter as a separate object (more control but slower)
     """
     
     # Clear the scene
@@ -182,21 +283,33 @@ def create_ring_with_text(
     ring = create_ring(inner_radius, outer_radius, ring_height)
     
     # Create curved text
-    text_obj, text_path = create_curved_text(
-        text=text,
-        radius=(inner_radius + outer_radius) / 2,
-        font_size=font_size,
-        extrude_depth=text_extrude,
-        font_path=font_path
-    )
-    
-    # Add materials
-    add_materials(ring, text_obj)
+    if use_individual_letters:
+        text_parent, text_objects = create_curved_text(
+            text=text,
+            radius=(inner_radius + outer_radius) / 2,
+            font_size=font_size,
+            extrude_depth=text_extrude,
+            font_path=font_path,
+            letter_spacing=letter_spacing
+        )
+        # Add materials
+        add_materials(ring, text_objects)
+    else:
+        text_obj, text_path = create_curved_text_single_object(
+            text=text,
+            radius=(inner_radius + outer_radius) / 2,
+            font_size=font_size,
+            extrude_depth=text_extrude,
+            font_path=font_path,
+            letter_spacing=letter_spacing
+        )
+        # Add materials
+        add_materials(ring, text_obj)
     
     # Export the result
     export_result(output_path)
     
-    return ring, text_obj
+    return ring
 
 def create_customizable_ring_from_config(config_file):
     """Load configuration from JSON and create ring"""
@@ -218,7 +331,9 @@ def create_customizable_ring_from_config(config_file):
         font_size=text_config.get('size', 0.3),
         text_extrude=text_config.get('extrude', 0.1),
         font_path=text_config.get('font_path'),
-        output_path=export_config.get('output_path', 'ring.stl')
+        letter_spacing=text_config.get('letter_spacing', 0.1),
+        output_path=export_config.get('output_path', 'ring.stl'),
+        use_individual_letters=text_config.get('use_individual_letters', False)
     )
 
 # Usage with config file
