@@ -118,7 +118,7 @@ def add_materials(ring, text):
 
 def export_result(filepath="ring_with_text.obj"):
     """Export the final result"""
-    bpy.ops.export_scene.obj(filepath=filepath, use_selection=False)
+    bpy.ops.wm.obj_export(filepath=filepath, export_selected_objects=False)
     print(f"Exported to {filepath}")
 
 def create_ring_with_text(
