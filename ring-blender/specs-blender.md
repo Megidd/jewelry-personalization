@@ -12,22 +12,40 @@ The script is to be run by this command on a Linux server without graphical user
 blender --background --python script.py -- config.json
 ```
 
+# Units
+
+All measurements are in millimeters.
+
+# Case sensitivity
+
+The written 3D text on the ring would be case sensitive.
+
+# Ring
+
+The ring's shape would be a cylinder with:
+
+* Inner diameter.
+* Outer diameter.
+* Length.
+
 # Configuration JSON
 
 A JSON configuration file of `config.json` to be passed as input of the script.
 
 The config file would contain user inputs, including:
 
-* Text to be written
-* Path to TTF font file
-* Text size
-* Is text going to be embossed (raised) on the ring by a text depth?
-* Is text going to be carved (removed) on the ring by a text depth?
-* Letter spacing
-* Ring inner radius
-* Ring outter radius
-* Is ring shape of a cylinder with a height?
-* Is ring shape of a torus?
+* Text to be written.
+* Path to TTF font file.
+* Text size.
+* Text is going to be either embossed (raised) or carved (removed) on the ring by a text depth.
+   * At least either one of embossed or carved should be true.
+   * Both cannot be true simultaneously.
+* Text depth.
+   * The dimension of embossed or carved text with respect to the ring surface.
+* Letter spacing.
+* Ring inner diameter.
+* Ring outter diameter.
+* Ring length.
 * STL export file name
 
 # Export STL
@@ -42,6 +60,11 @@ The script would process and create a jewelry ring with 3D text on it, like this
 * The `z` axis would be perpendicular to the ring's `xy` plane.
 * The text would be written on the ring's surface.
    * Text center would be approximately located at the intersection of the ring's mesh with the `y` axis.
+   * Text could possibly wrap around the entire ring circumference if text is too long.
+   * Text could possibly cover just a portion of ring circumference if text is short.
+   * If text is too long to fit, it should wrap around.
+   * The text is curved to follow the ring’s curvature.
+   * The text should be on the outer surface the ring, at the outer radius of ring.
 * This camera would read the text from left-to-right correctly:
    * Camera is located on the `y` axis.
    * Camera is looking at the `-y` direction.
