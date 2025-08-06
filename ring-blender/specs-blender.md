@@ -122,6 +122,10 @@ Text is centered vertically on the ring’s length. This mean:
 * The text’s vertical center is at `Z=0`.
 * Therefore, the text baseline is at `Z=-(text height or text size)/2`.
 
+# Text wrapping
+
+If the entire supplied text plus letter spacing does not fit before reaching 360 degrees, the script truncates it to fit and issues a warning/log.
+
 # Error handling
 
 The script should validate inputs and return proper error messages accordingly. For example when:
