@@ -28,7 +28,7 @@ The ring's shape would be a cylinder with:
 * Outer diameter.
 * Length.
 
-The ring creation as a cylinder should be smooth enough to be worn by human finger.
+The ring creation as a cylinder should be smooth enough to be worn by human finger. Ring cylinder should have at least 256 radial segments
 
 # Configuration JSON
 
@@ -57,6 +57,10 @@ The config file would contain user inputs, including:
 * STL export file name
 * Log file name.
    * Containing errors and other logs.
+
+# Relative path
+
+All relative paths are resolved from the directory containing the `config.json` file
 
 # Export STL
 
@@ -138,6 +142,7 @@ The script should validate inputs and return proper error messages accordingly. 
 * Text Depth for Different Ring Thicknesses:
    * If text depth is greater than ring thickness
    * There should be validation for this case.
+   * In this case, just log a warning and continue with a _cap_.
 
 The script should return errors by:
 
@@ -145,17 +150,26 @@ The script should return errors by:
 * Write to a log file.
 * Return error codes.
 
+# Error codes
+
+Define:
+
+* Exit code 0: Success
+* Exit code 1: Input validation error
+* Exit code 2: File I/O error
+* Exit code 3: Blender operation error
+
 # Font rendering
 
 * Multi-line text are ignored. It means newlines are ignored in the string.
-* Special characters not in the font are shown with question mark `?` or any other clear symbol.
+* Special characters not in the font are shown with a globally available font like `Arial`.
 * Right-to-left languages are ignored for now.
 
 # STL export
 
 The STL should be:
 
-* binary.
+* Binary.
 * Millimeter units.
 * Single mesh containing the 3D ring and the text on it.
 
