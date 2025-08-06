@@ -94,6 +94,7 @@ The text would be written on the ring's surface:
 * Input text size in JSON file is the height along the Z-axis, parallel to ring length.
 * It is measured before curving.
 * It should be smaller the ring’s length, of course.
+* If `text size >= ring length`, log a warning and cap to max possible.
 
 # Letter spacing
 
@@ -102,6 +103,7 @@ Letter spacing in JSON file:
 * It is the the arc length between letters on the curved surface.
 * It is measured from letter edge to edge:
    * The value is just added to the kerning from the font file.
+* Letter spacing must be `>= 0`. Negative values default to `0` with warning. Values `>` ring circumference cause error (exit code 1).
 
 # Text orientation
 
@@ -162,7 +164,7 @@ Define:
 # Font rendering
 
 * Multi-line text are ignored. It means newlines are ignored in the string.
-* Special characters not in the font are shown with a globally available font like `Arial`.
+* Special characters not in the font are replaced with `?` character from the same font or skip if `?` also missing.
 * Right-to-left languages are ignored for now.
 
 # STL export
@@ -172,6 +174,8 @@ The STL should be:
 * Binary.
 * Millimeter units.
 * Single mesh containing the 3D ring and the text on it.
+
+Output file path follows same rules as other paths - relative to `config.json` directory.
 
 # Boolean operation
 
