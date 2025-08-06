@@ -21,7 +21,8 @@ The config file would contain user inputs, including:
 * Text to be written
 * Path to TTF font file
 * Text size
-* Text depth
+* Is text going to be embossed (raised) on the ring by a text depth?
+* Is text going to be carved (removed) on the ring by a text depth?
 * Letter spacing
 * Ring inner radius
 * Ring outter radius
