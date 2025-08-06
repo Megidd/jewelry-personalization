@@ -38,10 +38,6 @@ The config file would contain user inputs, including:
 
 * Text to be written.
 * Path to TTF font file.
-* Text diection.
-   * Right-to-left.
-   * Left-to-right.
-   * One and only one of them should be true.
 * Text size.
    * It's text height.
    * We don't get text width.
@@ -149,9 +145,7 @@ The script should return errors by:
 
 * Multi-line text are ignored. It means newlines are ignored in the string.
 * Special characters not in the font are shown with question mark `?` or any other clear symbol.
-* Right-to-left languages are handled by just switching the text direction.
-   * Some fonts might lack the support for right-to-left characters:
-      * In that case `?` symbol is shown for missing characters.
+* Right-to-left languages are ignored for now.
 
 # STL export
 
