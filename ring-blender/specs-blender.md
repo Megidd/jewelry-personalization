@@ -142,7 +142,7 @@ The script should validate inputs and return proper error messages accordingly. 
 * Text Depth for Different Ring Thicknesses:
    * If text depth is greater than ring thickness
    * There should be validation for this case.
-   * In this case, just log a warning and continue with a _cap_.
+   * In this case, just log a warning and continue with a _cap_ to maximum allowed.
 
 The script should return errors by:
 
