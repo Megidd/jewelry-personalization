@@ -1,14 +1,14 @@
 {
-    "text": "Forever Yours",
+    "text": "Forever Yours LINUX",
     "fontPath": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf",
-    "textSize": 2,
+    "textSize": 1,
     "isEmbossed": true,
     "isCarved": false,
-    "textDepth": 2,
+    "textDepth": 0.25,
     "letterSpacing": 1,
     "ringInnerDiameter": 18,
-    "ringOuterDiameter": 22,
-    "ringLength": 4,
+    "ringOuterDiameter": 19,
+    "ringLength": 1,
     "outputFileName": "ring.stl",
     "logFileName":"log.txt"
   }
