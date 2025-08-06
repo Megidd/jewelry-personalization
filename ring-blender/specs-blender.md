@@ -68,20 +68,26 @@ Export STL result by `bpy.ops.wm.stl_export` API for recent Blender versions.
 
 # Process
 
-The script would process and create a jewelry ring with 3D text on it, like this:
+The script would process and create a jewelry ring with 3D text on it.
+
+# Ring orientation
 
 * The `x` axis and `y` axis would form the plane for the ring.
    * Ring center would be at `0,0,0` coordinates.
    * Ring would extend half-length towards `+z` and half-length towards `-z`.
 * The `z` axis would be perpendicular to the ring's `xy` plane.
-* The text would be written on the ring's surface.
-   * Text horizontal center would be located at the intersection of the ring's mesh with the `+y` axis.
-   * Text could possibly wrap around the entire ring circumference if text is too long.
-      * If text wraps completely around and overlaps itself, it should stop at 360 degrees.
-         * The remaining text is just truncated.
-   * Text could possibly cover just a portion of ring circumference if text is short.
-   * The text is curved to follow the ring’s curvature.
-   * The text should be on the outer surface the ring, at the outer diameter of ring.
+
+# Text orentation
+
+The text would be written on the ring's surface:
+
+* Text horizontal center would be located at the intersection of the ring's mesh with the `+y` axis.
+* Text could possibly wrap around the entire ring circumference if text is too long.
+   * If text wraps completely around and overlaps itself, it should stop at 360 degrees.
+      * The remaining text is just truncated.
+* Text could possibly cover just a portion of ring circumference if text is short.
+* The text is curved to follow the ring’s curvature.
+* The text should be on the outer surface the ring, at the outer diameter of ring.
 
 # Text size
 
