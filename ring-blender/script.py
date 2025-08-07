@@ -459,7 +459,16 @@ class RingTextGenerator:
         text_depth_actual = max_y - min_y
         text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
-        text_center_y = (min_y + max_y) / 2
+        text_center_z = (min_z + max_z) / 2
+        
+        # IMPORTANT: For carved text, we need to position the front face at the surface
+        # For embossed text, we need to position the back face at the surface
+        if self.config['carved']:
+            # For carved: front of text (max_y) should be at ring surface
+            y_offset = -max_y  # This moves the front face to Y=0
+        else:
+            # For embossed: back of text (min_y) should be at ring surface  
+            y_offset = -min_y  # This moves the back face to Y=0
         
         # Check if text fits around circumference
         circumference = 2 * math.pi * radius
@@ -468,18 +477,18 @@ class RingTextGenerator:
         if text_width > available_circumference:
             self.log(f"WARNING: Text width ({text_width:.2f}mm) exceeds available circumference ({available_circumference:.2f}mm), "
                     f"text will be truncated", "WARNING")
-            # We'll handle truncation during the curving process
         
         # Calculate angular span
         text_angle = min(text_width / radius, (available_circumference / radius))
         
         self.log(f"Curving text around ring (width: {text_width:.2f}mm, angle: {math.degrees(text_angle):.2f}°)")
+        self.log(f"Text depth range: {min_y:.3f} to {max_y:.3f}mm, applying offset: {y_offset:.3f}mm")
         
         # Apply curve deformation to vertices
         for vertex in mesh.vertices:
             x = vertex.co.x - text_center_x
-            y = vertex.co.y - text_center_y
-            z = vertex.co.z
+            y = vertex.co.y + y_offset  # Apply the offset to normalize position
+            z = vertex.co.z - text_center_z  # Center vertically
             
             # Check if vertex is within allowed range
             if abs(x) > available_circumference / 2:
@@ -494,12 +503,15 @@ class RingTextGenerator:
                 angle = (x / radius)
             
             # Calculate radial position
-            if is_embossed:
-                # Text extends outward from surface
-                r = radius + y
+            # Now y should be:
+            # - For carved text: 0 at surface, negative values going into the ring
+            # - For embossed text: 0 at surface, positive values extending outward
+            if self.config['carved']:
+                # For carved text, subtract from radius (going inward)
+                r = radius + y  # y will be <= 0, so this reduces radius
             else:
-                # Text carved into surface
-                r = radius + y
+                # For embossed text, add to radius (going outward)
+                r = radius + y  # y will be >= 0, so this increases radius
             
             # Convert to cylindrical coordinates
             # Position at +Y axis intersection as per spec
@@ -519,6 +531,7 @@ class RingTextGenerator:
         bpy.ops.object.mode_set(mode='OBJECT')
         
         return True
+
     
     def combine_ring_and_text(self, ring_obj, text_obj):
         """Combine ring and text using boolean operations"""
