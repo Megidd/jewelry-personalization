@@ -1,182 +1,148 @@
-The following sections are the specifictions for the required code.
+# Ring Generator with 3D Text - Technical Specifications
 
-# Script
+## 1. Overview
 
-A Python script file of `script.py` to employ Blender Python API.
+A Python script (`script.py`) using Blender Python API to generate a customizable ring with 3D text embossed or carved on its surface.
 
-# How to run
+## 2. Execution
 
-The script is to be run by this command on a Linux server without graphical user interface:
-
-```
+### 2.1 Command Line
+```bash
 blender --background --python script.py -- config.json
 ```
+- Runs on Linux server without GUI
+- Accepts JSON configuration file as argument
 
-# Units
+### 2.2 File Structure
+- `script.py` - Main Python script
+- `config.json` - Configuration file
+- All paths are relative to the directory containing `config.json`
 
-All measurements are in millimeters.
+## 3. Configuration Parameters
 
-# Case sensitivity
+### 3.1 Text Parameters
+| Parameter | Type | Description | Validation |
+|-----------|------|-------------|------------|
+| `text` | string | Text to be written on ring | Case-sensitive, single-line only |
+| `font_path` | string | Path to TTF font file | Must exist, relative to config directory |
+| `text_size` | float | Height of text in mm (Z-axis) | Must be < ring_length |
+| `text_depth` | float | Depth of embossing/carving in mm | Capped to ring thickness if exceeded |
+| `letter_spacing` | float | Arc length between letters in mm | >= 0, < ring circumference |
+| `embossed` | boolean | Text extends outward from surface | At least one of embossed/carved must be true |
+| `carved` | boolean | Text extends inward from surface | Cannot be true if embossed is true |
 
-The written 3D text on the ring would be case sensitive.
+### 3.2 Ring Parameters
+| Parameter | Type | Description | Validation |
+|-----------|------|-------------|------------|
+| `inner_diameter` | float | Inner diameter in mm | Must be < outer_diameter |
+| `outer_diameter` | float | Outer diameter in mm | Must be > inner_diameter |
+| `ring_length` | float | Ring height/length in mm | Must be > 0 |
 
-# Ring
+### 3.3 Output Parameters
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stl_filename` | string | Output STL file path |
+| `log_filename` | string | Log file path for errors/warnings |
 
-The ring's shape would be a cylinder with:
+## 4. Ring Geometry
 
-* Inner diameter.
-* Outer diameter.
-* Length.
+### 4.1 Shape Specifications
+- **Geometry**: Cylinder with 256+ radial segments for smoothness
+- **Ring Thickness**: `(outer_diameter - inner_diameter) / 2`
+- **Units**: All measurements in millimeters
 
-The ring creation as a cylinder should be smooth enough to be worn by human finger. Ring cylinder should have at least 256 radial segments
+### 4.2 Coordinate System
+- **Origin**: Ring center at (0, 0, 0)
+- **XY Plane**: Ring's circular plane
+- **Z-Axis**: Ring extends ±ring_length/2 from origin
 
-# Configuration JSON
+## 5. Text Positioning
 
-A JSON configuration file of `config.json` to be passed as input of the script.
+### 5.1 Placement Rules
+- **Horizontal Center**: Intersection of +Y axis with outer circumference
+- **Vertical Center**: Z = 0 (text baseline at Z = -text_size/2)
+- **Surface**: Outer surface of ring at outer diameter
+- **Curvature**: Text follows ring's circular curvature
 
-The config file would contain user inputs, including:
+### 5.2 Text Wrapping
+- Text wraps around circumference if needed
+- Maximum wrap: 360 degrees
+- Excess text is truncated with warning
 
-* Text to be written.
-* Path to TTF font file.
-* Text size.
-   * It's text height.
-   * We don't get text width.
-* Text is going to be either embossed (raised) or carved (removed) on the ring by a text depth.
-   * At least either one of embossed or carved should be true.
-   * Both cannot be true simultaneously.
-   * if both are false, the script should default to embossed.
-* Text depth.
-   * The dimension of embossed or carved text with respect to the ring surface.
-   * For embossing, text depth is how much text extends outward from the ring’s outer surface.
-   * For carving, text depth is how much text extends inward from the ring's outer surface.
-* Letter spacing.
-   * It's in millimeter units betweeen letters.
-* Ring inner diameter.
-* Ring outter diameter.
-* Ring length.
-* STL export file name
-* Log file name.
-   * Containing errors and other logs.
+### 5.3 Text Rendering
+- **Multi-line**: Newlines ignored (single line only)
+- **Missing Characters**: Replaced with '?' or skipped if '?' unavailable
+- **RTL Languages**: Not supported in current version
 
-# Relative path
+## 6. Boolean Operations
 
-All relative paths are resolved from the directory containing the `config.json` file
+### 6.1 Embossed Text
+- Text extends outward from outer surface by `text_depth`
+- Boolean union operation with ring mesh
 
-# Export STL
+### 6.2 Carved Text
+- Text extends inward from outer surface by `text_depth`
+- Boolean difference operation with ring mesh
+- Handles punch-through cases (when depth > ring thickness)
 
-Export STL result by `bpy.ops.wm.stl_export` API for recent Blender versions.
+## 7. Export Specifications
 
-# Process
+### 7.1 STL Format
+- **Format**: Binary STL
+- **Units**: Millimeters
+- **Mesh**: Single unified mesh (ring + text)
+- **API**: `bpy.ops.wm.stl_export` (for recent Blender versions)
 
-The script would process and create a jewelry ring with 3D text on it.
+## 8. Error Handling
 
-# Ring orientation
+### 8.1 Exit Codes
+| Code | Description | Examples |
+|------|-------------|----------|
+| 0 | Success | Normal execution |
+| 1 | Input validation error | Invalid dimensions, missing required fields |
+| 2 | File I/O error | Font file not found, cannot write STL |
+| 3 | Blender operation error | Boolean operation failure, mesh generation error |
 
-* The `x` axis and `y` axis would form the plane for the ring.
-   * Ring center would be at `0,0,0` coordinates.
-   * Ring would extend half-length towards `+z` and half-length towards `-z`.
-* The `z` axis would be perpendicular to the ring's `xy` plane.
+### 8.2 Validation Rules
+- **Font File**: Must exist and be readable
+- **Diameters**: inner_diameter < outer_diameter
+- **Text Size**: < ring_length (auto-capped with warning if exceeded)
+- **Text Depth**: <= ring_thickness (auto-capped with warning if exceeded)
+- **Letter Spacing**: >= 0 and < ring_circumference
+- **Embossed/Carved**: Default to embossed if both false
 
-# Text orentation
+### 8.3 Logging
+- Console output for immediate feedback
+- Log file with timestamps for all warnings/errors
+- Detailed error messages with suggested fixes
 
-The text would be written on the ring's surface:
+## 9. Default Values and Best Practices
 
-* Text horizontal center would be located at the intersection of the ring's mesh with the `+y` axis.
-* Text could possibly wrap around the entire ring circumference if text is too long.
-   * If text wraps completely around and overlaps itself, it should stop at 360 degrees.
-      * The remaining text is just truncated.
-* Text could possibly cover just a portion of ring circumference if text is short.
-* The text is curved to follow the ring’s curvature.
-* The text should be on the outer surface the ring, at the outer diameter of ring.
+### 9.1 Recommended Defaults
+- **Radial Segments**: 256 (minimum for smooth wearing surface)
+- **Text Mode**: Embossed (if not specified)
+- **Letter Spacing**: 0 (use font's natural kerning)
 
-# Text size
+### 9.2 Practical Constraints
+- **Minimum Ring Thickness**: 1.5mm (for structural integrity)
+- **Maximum Text Depth**: 50% of ring thickness (to prevent weakness)
+- **Text Size Range**: 20-80% of ring length (for readability)
 
-* Input text size in JSON file is the height along the Z-axis, parallel to ring length.
-* It is measured before curving.
-* It should be smaller the ring’s length, of course.
-* If `text size >= ring length`, log a warning and cap to max possible.
+## 10. Example Configuration
 
-# Letter spacing
-
-Letter spacing in JSON file:
-
-* It is the the arc length between letters on the curved surface.
-* It is measured from letter edge to edge:
-   * The value is just added to the kerning from the font file.
-* Letter spacing must be `>= 0`. Negative values default to `0` with warning. Values `>` ring circumference cause error (exit code 1).
-
-# Text orientation
-
-As just documentation about text orientation, this camera would read the text from left-to-right correctly:
-
-* Camera is located on the `y` axis.
-* Camera is looking at the `-y` direction.
-* Camera's up vector is `-z` axis.
-
-# Text alignment
-
-* Text is centered vertically on the ring’s length.
-* There are not options for text alignment (center, left, right), since the text is aligned this way:
-   * Text horizontal center is the location of `+y` axis intersection with the ring outer circumference.
-
-Text baseline is curved at ring’s outer surface, centered at positive Y axis.
-
-# Text vertical centering
-
-Text is centered vertically on the ring’s length. This mean:
-
-* The text’s vertical center is at `Z=0`.
-* Therefore, the text baseline is at `Z=-(text height or text size)/2`.
-
-# Text wrapping
-
-If the entire supplied text plus letter spacing does not fit before reaching 360 degrees, the script truncates it to fit and issues a warning/log.
-
-# Error handling
-
-The script should validate inputs and return proper error messages accordingly. For example when:
-
-* If font file doesn’t exist.
-* If inner diameter >= outer diameter.
-* If text doesn’t fit on the ring, even after wrapping around the ring circumference.
-   * If text wraps completely around and overlaps itself, it should stop at 360 degrees.
-      * The remaining text is just truncated.
-* Text Depth for Different Ring Thicknesses:
-   * If text depth is greater than ring thickness
-   * There should be validation for this case.
-   * In this case, just log a warning and continue with a _cap_ to maximum allowed.
-
-The script should return errors by:
-
-* Print to console.
-* Write to a log file.
-* Return error codes.
-
-# Error codes
-
-Define:
-
-* Exit code 0: Success
-* Exit code 1: Input validation error
-* Exit code 2: File I/O error
-* Exit code 3: Blender operation error
-
-# Font rendering
-
-* Multi-line text are ignored. It means newlines are ignored in the string.
-* Special characters not in the font are replaced with `?` character from the same font or skip if `?` also missing.
-* Right-to-left languages are ignored for now.
-
-# STL export
-
-The STL should be:
-
-* Binary.
-* Millimeter units.
-* Single mesh containing the 3D ring and the text on it.
-
-Output file path follows same rules as other paths - relative to `config.json` directory.
-
-# Boolean operation
-
-For carved text, the boolean difference operation should handle edge cases, like when the carved depth is more than the ring thickness and the carving will be punching through the inner diameter.
+```json
+{
+  "text": "FOREVER",
+  "font_path": "./fonts/arial.ttf",
+  "text_size": 3.0,
+  "text_depth": 0.5,
+  "letter_spacing": 0.2,
+  "embossed": true,
+  "carved": false,
+  "inner_diameter": 18.0,
+  "outer_diameter": 22.0,
+  "ring_length": 6.0,
+  "stl_filename": "output/custom_ring.stl",
+  "log_filename": "output/ring_generation.log"
+}
+```
