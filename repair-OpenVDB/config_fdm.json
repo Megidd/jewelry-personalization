@@ -1,0 +1,11 @@
+{
+    "input_stl": "/path/to/broken_model.stl",
+    "output_stl": "/path/to/repaired_model.stl",
+    "printing_type": "FDM",
+    "nozzle_diameter": 0.4,
+    "use_multi_resolution": true,
+    "preserve_features": true,
+    "pre_process": true,
+    "apply_closing": true,
+    "smooth_iterations": 2
+}

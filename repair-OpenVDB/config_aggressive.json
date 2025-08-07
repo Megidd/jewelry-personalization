@@ -1,0 +1,11 @@
+{
+    "input_stl": "heavily_damaged.stl",
+    "output_stl": "aggressively_repaired.stl",
+    "printing_type": "GENERAL",
+    "use_multi_resolution": true,
+    "preserve_features": false,
+    "pre_process": true,
+    "apply_closing": true,
+    "smooth_iterations": 5,
+    "voxel_size": 1.0
+}

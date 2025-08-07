@@ -1,0 +1,12 @@
+{
+    "input_stl": "../ring-blender/output/custom_ring.stl",
+    "output_stl": "fixed.stl",
+    "printing_type": "SLA",
+    "layer_height": 0.05,
+    "use_multi_resolution": false,
+    "preserve_features": true,
+    "voxel_size": null,
+    "pre_process": true,
+    "apply_closing": true,
+    "smooth_iterations": 1
+}

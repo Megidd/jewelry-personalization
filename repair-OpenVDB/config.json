@@ -1,0 +1,5 @@
+{
+    "input_stl": "broken_model.stl",
+    "output_stl": "repaired_model.stl",
+    "printing_type": "GENERAL"
+}

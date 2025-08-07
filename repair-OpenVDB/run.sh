@@ -1,1 +1,1 @@
-blender --background --python repair.py
+blender --background --python repair.py -- config_sla.json

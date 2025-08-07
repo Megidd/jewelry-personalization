@@ -3,7 +3,10 @@ import bmesh
 import numpy as np
 from mathutils import Vector
 import os
+import sys
+import json
 from enum import Enum
+from pathlib import Path
 
 class PrintingType(Enum):
     FDM = "FDM"
@@ -34,6 +37,10 @@ class MeshRepairOpenVDB:
     def import_stl(self):
         """Import STL file"""
         print(f"Importing STL from: {self.input_path}")
+        
+        # Check if file exists
+        if not os.path.exists(self.input_path):
+            raise FileNotFoundError(f"Input STL file not found: {self.input_path}")
         
         # Import the STL file
         bpy.ops.import_mesh.stl(filepath=self.input_path)
@@ -79,9 +86,13 @@ class MeshRepairOpenVDB:
         
         for edge in bm.edges:
             length = edge.calc_length()
-            min_edge_length = min(min_edge_length, length)
+            if length > 0:  # Avoid zero-length edges
+                min_edge_length = min(min_edge_length, length)
             avg_edge_length += length
             edge_count += 1
+            
+        if min_edge_length == float('inf'):
+            min_edge_length = bbox_diagonal * 0.001
             
         avg_edge_length = avg_edge_length / edge_count if edge_count > 0 else bbox_diagonal * 0.01
         
@@ -115,10 +126,15 @@ class MeshRepairOpenVDB:
         }
     
     def calculate_voxel_size(self, mesh_stats, printing_type=PrintingType.GENERAL, 
-                           nozzle_diameter=0.4, layer_height=0.1):
+                           nozzle_diameter=0.4, layer_height=0.1, custom_voxel_size=None):
         """
         Calculate optimal voxel size based on mesh statistics and printing parameters
         """
+        # If custom voxel size is specified, use it
+        if custom_voxel_size is not None and custom_voxel_size > 0:
+            print(f"Using custom voxel size: {custom_voxel_size:.4f}")
+            return custom_voxel_size
+        
         bbox_diagonal = mesh_stats['bbox_diagonal']
         min_edge_length = mesh_stats['min_edge_length']
         
@@ -324,6 +340,11 @@ class MeshRepairOpenVDB:
         """Export the repaired mesh as STL"""
         print(f"Exporting repaired mesh to: {self.output_path}")
         
+        # Create output directory if it doesn't exist
+        output_dir = os.path.dirname(self.output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
         # Select only the repaired object
         bpy.ops.object.select_all(action='DESELECT')
         obj.select_set(True)
@@ -340,9 +361,11 @@ class MeshRepairOpenVDB:
     
     def repair(self, printing_type=PrintingType.GENERAL, 
                nozzle_diameter=0.4, layer_height=0.1,
-               use_multi_resolution=False, preserve_features=True):
+               use_multi_resolution=False, preserve_features=True,
+               custom_voxel_size=None, pre_process=True,
+               apply_closing=True, smooth_iterations=2):
         """
-        Main repair function
+        Main repair function with additional parameters
         """
         print("="*50)
         print("Starting OpenVDB Mesh Repair Process")
@@ -360,14 +383,16 @@ class MeshRepairOpenVDB:
             mesh_stats['edge_count'] = len(self.original_mesh.data.edges)
             
             # Pre-process
-            self.pre_process_mesh(self.original_mesh)
+            if pre_process:
+                self.pre_process_mesh(self.original_mesh)
             
             # Calculate optimal voxel size
             voxel_size = self.calculate_voxel_size(
                 mesh_stats, 
                 printing_type, 
                 nozzle_diameter, 
-                layer_height
+                layer_height,
+                custom_voxel_size
             )
             
             # Apply repair strategy
@@ -378,8 +403,8 @@ class MeshRepairOpenVDB:
                 self.apply_voxel_remesh(
                     self.original_mesh, 
                     voxel_size,
-                    apply_closing=(mesh_stats['hole_count'] > 0),
-                    smooth_iterations=2 if preserve_features else 0
+                    apply_closing=apply_closing or (mesh_stats['hole_count'] > 0),
+                    smooth_iterations=smooth_iterations if preserve_features else 0
                 )
                 self.repaired_mesh = self.original_mesh
             
@@ -417,90 +442,142 @@ class MeshRepairOpenVDB:
             return False
 
 
-# ============================================================================
-# MAIN EXECUTION FUNCTION
-# ============================================================================
+def load_config(config_path):
+    """
+    Load configuration from JSON file
+    """
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        
+        print(f"Configuration loaded from: {config_path}")
+        print(f"Config: {json.dumps(config, indent=2)}")
+        
+        return config
+    
+    except FileNotFoundError:
+        print(f"Error: Configuration file not found: {config_path}")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in configuration file: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
+        sys.exit(1)
 
-def repair_stl_with_openvdb(input_stl_path, output_stl_path, 
-                           printing_type="GENERAL",
-                           nozzle_diameter=0.4,
-                           layer_height=0.1,
-                           use_multi_resolution=False,
-                           preserve_features=True):
+
+def validate_config(config):
     """
-    Main function to repair an STL file using OpenVDB approach
-    
-    Args:
-        input_stl_path: Path to input STL file
-        output_stl_path: Path to save repaired STL file
-        printing_type: "FDM", "SLA", or "GENERAL"
-        nozzle_diameter: For FDM printing (mm)
-        layer_height: For SLA printing (mm)
-        use_multi_resolution: Use multi-resolution strategy for complex repairs
-        preserve_features: Apply feature preservation post-processing
-    
-    Returns:
-        bool: True if successful, False otherwise
+    Validate configuration and set defaults for missing values
     """
+    # Required fields
+    if 'input_stl' not in config:
+        raise ValueError("Missing required field: 'input_stl'")
+    if 'output_stl' not in config:
+        raise ValueError("Missing required field: 'output_stl'")
     
-    # Map string to enum
+    # Optional fields with defaults
+    defaults = {
+        'printing_type': 'GENERAL',
+        'nozzle_diameter': 0.4,
+        'layer_height': 0.1,
+        'use_multi_resolution': False,
+        'preserve_features': True,
+        'voxel_size': None,  # None means auto-calculate
+        'pre_process': True,
+        'apply_closing': True,
+        'smooth_iterations': 2
+    }
+    
+    # Apply defaults for missing fields
+    for key, default_value in defaults.items():
+        if key not in config:
+            config[key] = default_value
+            print(f"Using default value for '{key}': {default_value}")
+    
+    # Validate printing_type
+    valid_types = ['FDM', 'SLA', 'GENERAL']
+    if config['printing_type'].upper() not in valid_types:
+        print(f"Warning: Invalid printing_type '{config['printing_type']}'. Using 'GENERAL'")
+        config['printing_type'] = 'GENERAL'
+    
+    return config
+
+
+def main():
+    """
+    Main entry point for command-line execution
+    """
+    print("="*50)
+    print("OpenVDB Mesh Repair Tool")
+    print("="*50)
+    
+    # Parse command line arguments
+    argv = sys.argv
+    
+    # Find the "--" separator
+    try:
+        separator_index = argv.index("--")
+        script_args = argv[separator_index + 1:]
+    except ValueError:
+        print("Error: No configuration file specified")
+        print("Usage: blender --background --python repair.py -- config.json")
+        sys.exit(1)
+    
+    if len(script_args) < 1:
+        print("Error: No configuration file specified")
+        print("Usage: blender --background --python repair.py -- config.json")
+        sys.exit(1)
+    
+    config_path = script_args[0]
+    
+    # Make path absolute if relative
+    if not os.path.isabs(config_path):
+        config_path = os.path.abspath(config_path)
+    
+    # Load configuration
+    config = load_config(config_path)
+    
+    # Validate and apply defaults
+    config = validate_config(config)
+    
+    # Make paths absolute if they're relative
+    if not os.path.isabs(config['input_stl']):
+        # If relative, make it relative to the config file's directory
+        config_dir = os.path.dirname(config_path)
+        config['input_stl'] = os.path.abspath(os.path.join(config_dir, config['input_stl']))
+    
+    if not os.path.isabs(config['output_stl']):
+        config_dir = os.path.dirname(config_path)
+        config['output_stl'] = os.path.abspath(os.path.join(config_dir, config['output_stl']))
+    
+    # Map string to enum for printing type
     printing_type_map = {
         "FDM": PrintingType.FDM,
         "SLA": PrintingType.SLA,
         "GENERAL": PrintingType.GENERAL
     }
-    
-    printing_type_enum = printing_type_map.get(printing_type.upper(), PrintingType.GENERAL)
+    printing_type_enum = printing_type_map.get(config['printing_type'].upper(), PrintingType.GENERAL)
     
     # Create repair instance
-    repairer = MeshRepairOpenVDB(input_stl_path, output_stl_path)
+    repairer = MeshRepairOpenVDB(config['input_stl'], config['output_stl'])
     
-    # Execute repair
+    # Execute repair with all parameters
     success = repairer.repair(
         printing_type=printing_type_enum,
-        nozzle_diameter=nozzle_diameter,
-        layer_height=layer_height,
-        use_multi_resolution=use_multi_resolution,
-        preserve_features=preserve_features
+        nozzle_diameter=config['nozzle_diameter'],
+        layer_height=config['layer_height'],
+        use_multi_resolution=config['use_multi_resolution'],
+        preserve_features=config['preserve_features'],
+        custom_voxel_size=config['voxel_size'],
+        pre_process=config['pre_process'],
+        apply_closing=config['apply_closing'],
+        smooth_iterations=config['smooth_iterations']
     )
     
-    return success
+    # Exit with appropriate code
+    sys.exit(0 if success else 1)
 
-
-# ============================================================================
-# EXAMPLE USAGE
-# ============================================================================
 
 if __name__ == "__main__":
-    # Example usage - modify these paths for your files
-    INPUT_STL = "/path/to/your/broken_model.stl"
-    OUTPUT_STL = "/path/to/your/repaired_model.stl"
-    
-    # For FDM printing with 0.4mm nozzle
-    success = repair_stl_with_openvdb(
-        input_stl_path=INPUT_STL,
-        output_stl_path=OUTPUT_STL,
-        printing_type="FDM",
-        nozzle_diameter=0.4,
-        use_multi_resolution=True,
-        preserve_features=True
-    )
-    
-    # For SLA printing with 0.05mm layer height
-    # success = repair_stl_with_openvdb(
-    #     input_stl_path=INPUT_STL,
-    #     output_stl_path=OUTPUT_STL,
-    #     printing_type="SLA",
-    #     layer_height=0.05,
-    #     use_multi_resolution=False,
-    #     preserve_features=True
-    # )
-    
-    # For general repair with automatic parameters
-    # success = repair_stl_with_openvdb(
-    #     input_stl_path=INPUT_STL,
-    #     output_stl_path=OUTPUT_STL,
-    #     printing_type="GENERAL",
-    #     use_multi_resolution=True,
-    #     preserve_features=True
-    # )
+    main()

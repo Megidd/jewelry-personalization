@@ -1,0 +1,11 @@
+{
+    "input_stl": "input/damaged_mesh.stl",
+    "output_stl": "output/repaired_mesh.stl",
+    "printing_type": "GENERAL",
+    "voxel_size": 0.5,
+    "use_multi_resolution": false,
+    "preserve_features": true,
+    "pre_process": true,
+    "apply_closing": true,
+    "smooth_iterations": 3
+}
