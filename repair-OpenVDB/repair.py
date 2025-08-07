@@ -35,28 +35,61 @@ class MeshRepairOpenVDB:
             bpy.data.meshes.remove(mesh)
             
     def import_stl(self):
-        """Import STL file"""
+        """Import STL file with version compatibility"""
         print(f"Importing STL from: {self.input_path}")
+        print(f"Blender version: {bpy.app.version_string}")
         
         # Check if file exists
         if not os.path.exists(self.input_path):
             raise FileNotFoundError(f"Input STL file not found: {self.input_path}")
         
-        # Import the STL file
-        bpy.ops.import_mesh.stl(filepath=self.input_path)
+        # Store initial object count
+        initial_objects = set(bpy.data.objects)
         
-        # Get the imported object (should be the active object)
-        self.original_mesh = bpy.context.active_object
-        
-        if self.original_mesh is None:
-            raise Exception("Failed to import STL file")
+        # Try different import methods based on Blender version
+        try:
+            # For Blender 4.0+
+            if hasattr(bpy.ops.wm, 'stl_import'):
+                bpy.ops.wm.stl_import(filepath=self.input_path)
+            # For Blender 3.x
+            elif hasattr(bpy.ops.import_mesh, 'stl'):
+                bpy.ops.import_mesh.stl(filepath=self.input_path)
+            # For Blender 4.x alternative method
+            elif hasattr(bpy.ops, 'import_mesh') and hasattr(bpy.ops.import_mesh, 'stl'):
+                bpy.ops.import_mesh.stl(filepath=self.input_path)
+            else:
+                # Fallback: Try to use the new API
+                bpy.ops.wm.stl_import(filepath=self.input_path)
+        except AttributeError as e:
+            print(f"Failed with standard import operators: {e}")
+            print("Attempting alternative import method...")
             
+            # Alternative method: manually construct the operator call
+            try:
+                # This works in Blender 4.0+
+                bpy.ops.wm.stl_import(filepath=self.input_path)
+            except:
+                # Last resort: Try old operator
+                try:
+                    bpy.ops.import_mesh.stl(filepath=self.input_path)
+                except:
+                    raise Exception(f"Unable to import STL file. Blender version {bpy.app.version_string} may not be supported.")
+        
+        # Get the newly imported object
+        new_objects = set(bpy.data.objects) - initial_objects
+        
+        if not new_objects:
+            raise Exception("Failed to import STL file - no new objects created")
+        
+        # Get the imported object (should be the only new object)
+        self.original_mesh = list(new_objects)[0]
         self.original_mesh.name = "Original_Mesh"
         
         # Make sure it's selected and active
         bpy.context.view_layer.objects.active = self.original_mesh
         self.original_mesh.select_set(True)
         
+        print(f"Successfully imported: {self.original_mesh.name}")
         return self.original_mesh
     
     def analyze_mesh(self, obj):
@@ -337,7 +370,7 @@ class MeshRepairOpenVDB:
         return is_valid
     
     def export_stl(self, obj):
-        """Export the repaired mesh as STL"""
+        """Export the repaired mesh as STL with version compatibility"""
         print(f"Exporting repaired mesh to: {self.output_path}")
         
         # Create output directory if it doesn't exist
@@ -350,12 +383,50 @@ class MeshRepairOpenVDB:
         obj.select_set(True)
         bpy.context.view_layer.objects.active = obj
         
-        # Export as STL
-        bpy.ops.export_mesh.stl(
-            filepath=self.output_path,
-            use_selection=True,
-            ascii=False  # Binary STL for smaller file size
-        )
+        # Try different export methods based on Blender version
+        try:
+            # For Blender 4.0+
+            if hasattr(bpy.ops.wm, 'stl_export'):
+                bpy.ops.wm.stl_export(
+                    filepath=self.output_path,
+                    export_selected_objects=True,
+                    ascii_format=False  # Binary STL for smaller file size
+                )
+            # For Blender 3.x and earlier
+            elif hasattr(bpy.ops.export_mesh, 'stl'):
+                bpy.ops.export_mesh.stl(
+                    filepath=self.output_path,
+                    use_selection=True,
+                    ascii=False  # Binary STL for smaller file size
+                )
+            else:
+                # Fallback attempt
+                bpy.ops.wm.stl_export(
+                    filepath=self.output_path,
+                    export_selected_objects=True,
+                    ascii_format=False
+                )
+        except AttributeError as e:
+            print(f"Failed with standard export operators: {e}")
+            print("Attempting alternative export method...")
+            
+            # Alternative: Try the new API
+            try:
+                bpy.ops.wm.stl_export(
+                    filepath=self.output_path,
+                    export_selected_objects=True,
+                    ascii_format=False
+                )
+            except:
+                # Last resort: Try old operator
+                try:
+                    bpy.ops.export_mesh.stl(
+                        filepath=self.output_path,
+                        use_selection=True,
+                        ascii=False
+                    )
+                except:
+                    raise Exception(f"Unable to export STL file. Blender version {bpy.app.version_string} may not be supported.")
         
         print("Export complete")
     
@@ -510,6 +581,7 @@ def main():
     """
     print("="*50)
     print("OpenVDB Mesh Repair Tool")
+    print(f"Blender Version: {bpy.app.version_string}")
     print("="*50)
     
     # Parse command line arguments
