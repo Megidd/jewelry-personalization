@@ -1,15 +1,18 @@
 {
-    "text": "Forever Yours LINUX",
-    "fontPath": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf",
-    "textSize": 1,
-    "isEmbossed": true,
-    "isCarved": false,
-    "textDepth": 0.25,
-    "letterSpacing": 1,
-    "ringInnerDiameter": 18,
-    "ringOuterDiameter": 19,
-    "ringLength": 1,
-    "outputFileName": "ring.stl",
-    "logFileName":"log.txt"
-  }
-  
+  "text": "FOREVER",
+  "font_path": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf",
+  "text_size": 3.0,
+  "text_depth": 0.5,
+  "letter_spacing": 0.5,
+  "embossed": false,
+  "carved": true,
+  "text_direction": "normal",
+  "inner_diameter": 18.0,
+  "outer_diameter": 22.0,
+  "ring_length": 6.0,
+  "radial_segments": 256,
+  "vertical_segments": 64,
+  "stl_filename": "output/custom_ring.stl",
+  "log_filename": "output/ring_generation.log",
+  "create_parent_dirs": true
+}

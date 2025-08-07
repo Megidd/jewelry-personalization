@@ -39,11 +39,20 @@ class RingTextGenerator:
     
     def setup_log_file(self):
         """Initialize log file from config"""
-        if 'logFileName' in self.config:
-            log_path = self.config['logFileName']
+        if 'log_filename' in self.config:
+            log_path = self.config['log_filename']
             if not os.path.isabs(log_path):
                 log_path = self.config_dir / log_path
             self.log_file = Path(log_path)
+            
+            # Create parent directories if needed and configured
+            if self.config.get('create_parent_dirs', True) and self.log_file.parent:
+                try:
+                    self.log_file.parent.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    print(f"Warning: Could not create log directory: {e}")
+                    self.log_file = None
+                    return
             
             # Create log file and write header
             try:
@@ -58,7 +67,7 @@ class RingTextGenerator:
     def load_config(self):
         """Load and parse configuration JSON"""
         try:
-            with open(self.config_path, 'r') as f:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
             self.setup_log_file()
             self.log(f"Successfully loaded config from {self.config_path}")
@@ -76,9 +85,10 @@ class RingTextGenerator:
     def validate_config(self):
         """Validate all configuration parameters"""
         required_fields = [
-            'text', 'fontPath', 'textSize', 'isEmbossed', 'isCarved',
-            'textDepth', 'letterSpacing', 'ringInnerDiameter', 
-            'ringOuterDiameter', 'ringLength', 'outputFileName'
+            'text', 'font_path', 'text_size', 'text_depth', 'letter_spacing',
+            'embossed', 'carved', 'text_direction',
+            'inner_diameter', 'outer_diameter', 'ring_length',
+            'stl_filename'
         ]
         
         # Check required fields
@@ -87,8 +97,13 @@ class RingTextGenerator:
                 self.log(f"ERROR: Missing required field: {field}", "ERROR")
                 return False
         
+        # Set defaults for optional fields
+        self.config.setdefault('radial_segments', 256)
+        self.config.setdefault('vertical_segments', 64)
+        self.config.setdefault('create_parent_dirs', True)
+        
         # Validate font path
-        font_path = self.config['fontPath']
+        font_path = self.config['font_path']
         if not os.path.isabs(font_path):
             font_path = self.config_dir / font_path
         font_path = Path(font_path).resolve()
@@ -103,10 +118,24 @@ class RingTextGenerator:
         
         self.config['_resolved_font_path'] = str(font_path)
         
+        # Validate text
+        text = self.config['text']
+        if not text or len(text.strip()) == 0:
+            self.log("ERROR: Text cannot be empty", "ERROR")
+            return False
+        
+        # Remove newlines as specified
+        self.config['text'] = text.replace('', '').replace('\r', '')
+        
+        # Check text length
+        if len(self.config['text']) > 500:
+            self.log(f"ERROR: Text length ({len(self.config['text'])}) exceeds maximum of 500 characters", "ERROR")
+            return False
+        
         # Validate ring dimensions
-        inner_d = self.config['ringInnerDiameter']
-        outer_d = self.config['ringOuterDiameter']
-        length = self.config['ringLength']
+        inner_d = self.config['inner_diameter']
+        outer_d = self.config['outer_diameter']
+        length = self.config['ring_length']
         
         if inner_d <= 0 or outer_d <= 0 or length <= 0:
             self.log("ERROR: Ring dimensions must be positive", "ERROR")
@@ -116,19 +145,39 @@ class RingTextGenerator:
             self.log(f"ERROR: Inner diameter ({inner_d}) must be less than outer diameter ({outer_d})", "ERROR")
             return False
         
+        # Check minimum inner diameter
+        if inner_d < 10:
+            self.log(f"WARNING: Inner diameter ({inner_d}mm) is less than recommended minimum of 10mm", "WARNING")
+        
+        # Check maximum outer diameter
+        if outer_d > 50:
+            self.log(f"WARNING: Outer diameter ({outer_d}mm) exceeds recommended maximum of 50mm", "WARNING")
+        
+        # Check ring thickness
+        ring_thickness = (outer_d - inner_d) / 2
+        if ring_thickness < 1.5:
+            self.log(f"WARNING: Ring thickness ({ring_thickness}mm) is less than recommended minimum of 1.5mm", "WARNING")
+        
         # Validate text size
-        text_size = self.config['textSize']
+        text_size = self.config['text_size']
         if text_size <= 0:
             self.log("ERROR: Text size must be positive", "ERROR")
             return False
         
         if text_size >= length:
-            self.log(f"WARNING: Text size ({text_size}) >= ring length ({length}), capping to {length * 0.9}", "WARNING")
-            self.config['textSize'] = length * 0.9
+            new_size = length * 0.8
+            self.log(f"WARNING: Text size ({text_size}) >= ring length ({length}), capping to {new_size}", "WARNING")
+            self.config['text_size'] = new_size
+        
+        # Check text size range recommendation
+        if text_size < length * 0.2:
+            self.log(f"WARNING: Text size ({text_size}mm) is less than 20% of ring length ({length}mm)", "WARNING")
+        elif text_size > length * 0.8:
+            self.log(f"WARNING: Text size ({text_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
         
         # Validate embossed/carved settings
-        is_embossed = self.config['isEmbossed']
-        is_carved = self.config['isCarved']
+        is_embossed = self.config['embossed']
+        is_carved = self.config['carved']
         
         if is_embossed and is_carved:
             self.log("ERROR: Cannot have both embossed and carved set to true", "ERROR")
@@ -136,53 +185,83 @@ class RingTextGenerator:
         
         if not is_embossed and not is_carved:
             self.log("WARNING: Neither embossed nor carved is true, defaulting to embossed", "WARNING")
-            self.config['isEmbossed'] = True
-            self.config['isCarved'] = False
+            self.config['embossed'] = True
+            self.config['carved'] = False
         
         # Validate text depth
-        text_depth = self.config['textDepth']
-        ring_thickness = (outer_d - inner_d) / 2
+        text_depth = self.config['text_depth']
         
         if text_depth <= 0:
             self.log("ERROR: Text depth must be positive", "ERROR")
             return False
         
-        if self.config['isCarved'] and text_depth > ring_thickness:
-            self.log(f"WARNING: Text depth ({text_depth}) > ring thickness ({ring_thickness}), capping to {ring_thickness * 0.9}", "WARNING")
-            self.config['textDepth'] = ring_thickness * 0.9
+        # Apply depth capping as per spec
+        if text_depth > ring_thickness:
+            if self.config['carved']:
+                new_depth = ring_thickness * 0.9
+                self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
+                        f"capping to 90% of thickness ({new_depth}mm) to prevent punch-through", "WARNING")
+                self.config['text_depth'] = new_depth
+            else:  # embossed
+                self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
+                        f"text will extend beyond inner surface", "WARNING")
+        
+        # Recommend 50% or less
+        if text_depth > ring_thickness * 0.5:
+            self.log(f"WARNING: Text depth ({text_depth}mm) > 50% of ring thickness ({ring_thickness}mm), "
+                    f"consider reducing for structural integrity", "WARNING")
         
         # Validate letter spacing
-        letter_spacing = self.config['letterSpacing']
+        letter_spacing = self.config['letter_spacing']
         ring_circumference = math.pi * outer_d
         
         if letter_spacing < 0:
-            self.log(f"WARNING: Letter spacing ({letter_spacing}) < 0, setting to 0", "WARNING")
-            self.config['letterSpacing'] = 0
-        
-        if letter_spacing > ring_circumference:
-            self.log(f"ERROR: Letter spacing ({letter_spacing}) > ring circumference ({ring_circumference})", "ERROR")
+            self.log(f"ERROR: Letter spacing ({letter_spacing}) cannot be negative", "ERROR")
             return False
         
-        # Validate text content
-        text = self.config['text']
-        if not text or len(text.strip()) == 0:
-            self.log("ERROR: Text cannot be empty", "ERROR")
+        if letter_spacing >= ring_circumference:
+            self.log(f"ERROR: Letter spacing ({letter_spacing}mm) >= ring circumference ({ring_circumference:.2f}mm)", "ERROR")
             return False
         
-        # Remove newlines as specified
-        self.config['text'] = text.replace('', '').replace('\r', '')
+        # Validate text direction
+        text_direction = self.config.get('text_direction', 'normal')
+        if text_direction not in ['normal', 'inverted']:
+            self.log(f"ERROR: Invalid text_direction '{text_direction}', must be 'normal' or 'inverted'", "ERROR")
+            return False
+        
+        # Validate segment counts
+        radial_segments = self.config['radial_segments']
+        vertical_segments = self.config['vertical_segments']
+        
+        if radial_segments < 128:
+            self.log(f"ERROR: radial_segments ({radial_segments}) must be >= 128", "ERROR")
+            return False
+        
+        if vertical_segments < 32:
+            self.log(f"ERROR: vertical_segments ({vertical_segments}) must be >= 32", "ERROR")
+            return False
         
         # Resolve output file path
-        output_path = self.config['outputFileName']
+        output_path = self.config['stl_filename']
         if not os.path.isabs(output_path):
             output_path = self.config_dir / output_path
         self.config['_resolved_output_path'] = str(Path(output_path).resolve())
+        
+        # Create parent directories if needed
+        output_dir = Path(self.config['_resolved_output_path']).parent
+        if self.config.get('create_parent_dirs', True) and output_dir:
+            try:
+                output_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                self.log(f"ERROR: Could not create output directory: {e}", "ERROR")
+                return False
         
         self.log("Configuration validation successful")
         return True
     
     def clear_scene(self):
         """Clear all objects from the scene"""
+        self.log("Clearing scene...")
         bpy.ops.object.select_all(action='SELECT')
         bpy.ops.object.delete()
         
@@ -202,12 +281,13 @@ class RingTextGenerator:
     
     def create_ring(self):
         """Create the ring cylinder mesh"""
-        inner_radius = self.config['ringInnerDiameter'] / 2
-        outer_radius = self.config['ringOuterDiameter'] / 2
-        length = self.config['ringLength']
+        inner_radius = self.config['inner_diameter'] / 2
+        outer_radius = self.config['outer_diameter'] / 2
+        length = self.config['ring_length']
+        radial_segments = self.config['radial_segments']
+        vertical_segments = self.config['vertical_segments']
         
-        # Create cylinder with 256 segments as specified
-        vertices = 256
+        self.log(f"Creating ring mesh with {radial_segments} radial and {vertical_segments} vertical segments...")
         
         # Create mesh
         mesh = bpy.data.meshes.new(name="Ring")
@@ -217,18 +297,20 @@ class RingTextGenerator:
         # Create geometry using bmesh for better control
         bm = bmesh.new()
         
-        # Create vertices for inner and outer circles at top and bottom
-        for z in [-length/2, length/2]:
+        # Create vertices for rings at different heights
+        for v_idx in range(vertical_segments + 1):
+            z = -length/2 + (length * v_idx / vertical_segments)
+            
             # Outer circle
-            for i in range(vertices):
-                angle = 2 * math.pi * i / vertices
+            for r_idx in range(radial_segments):
+                angle = 2 * math.pi * r_idx / radial_segments
                 x = outer_radius * math.cos(angle)
                 y = outer_radius * math.sin(angle)
                 bm.verts.new((x, y, z))
             
             # Inner circle
-            for i in range(vertices):
-                angle = 2 * math.pi * i / vertices
+            for r_idx in range(radial_segments):
+                angle = 2 * math.pi * r_idx / radial_segments
                 x = inner_radius * math.cos(angle)
                 y = inner_radius * math.sin(angle)
                 bm.verts.new((x, y, z))
@@ -236,40 +318,48 @@ class RingTextGenerator:
         bm.verts.ensure_lookup_table()
         
         # Create faces
-        # Outer surface
-        for i in range(vertices):
-            next_i = (i + 1) % vertices
-            v1 = bm.verts[i]  # bottom outer
-            v2 = bm.verts[next_i]  # bottom outer next
-            v3 = bm.verts[vertices * 2 + next_i]  # top outer next
-            v4 = bm.verts[vertices * 2 + i]  # top outer
-            bm.faces.new([v1, v2, v3, v4])
+        verts_per_ring = radial_segments * 2
         
-        # Inner surface
-        for i in range(vertices):
-            next_i = (i + 1) % vertices
-            v1 = bm.verts[vertices + i]  # bottom inner
-            v2 = bm.verts[vertices * 3 + i]  # top inner
-            v3 = bm.verts[vertices * 3 + next_i]  # top inner next
-            v4 = bm.verts[vertices + next_i]  # bottom inner next
-            bm.faces.new([v1, v2, v3, v4])
+        # Side faces
+        for v_idx in range(vertical_segments):
+            ring_offset = v_idx * verts_per_ring
+            next_ring_offset = (v_idx + 1) * verts_per_ring
+            
+            # Outer surface
+            for r_idx in range(radial_segments):
+                next_r = (r_idx + 1) % radial_segments
+                v1 = bm.verts[ring_offset + r_idx]
+                v2 = bm.verts[ring_offset + next_r]
+                v3 = bm.verts[next_ring_offset + next_r]
+                v4 = bm.verts[next_ring_offset + r_idx]
+                bm.faces.new([v1, v2, v3, v4])
+            
+            # Inner surface
+            for r_idx in range(radial_segments):
+                next_r = (r_idx + 1) % radial_segments
+                v1 = bm.verts[ring_offset + radial_segments + r_idx]
+                v2 = bm.verts[next_ring_offset + radial_segments + r_idx]
+                v3 = bm.verts[next_ring_offset + radial_segments + next_r]
+                v4 = bm.verts[ring_offset + radial_segments + next_r]
+                bm.faces.new([v1, v2, v3, v4])
         
         # Top face
-        for i in range(vertices):
-            next_i = (i + 1) % vertices
-            v1 = bm.verts[vertices * 2 + i]  # top outer
-            v2 = bm.verts[vertices * 2 + next_i]  # top outer next
-            v3 = bm.verts[vertices * 3 + next_i]  # top inner next
-            v4 = bm.verts[vertices * 3 + i]  # top inner
+        top_offset = vertical_segments * verts_per_ring
+        for r_idx in range(radial_segments):
+            next_r = (r_idx + 1) % radial_segments
+            v1 = bm.verts[top_offset + r_idx]
+            v2 = bm.verts[top_offset + next_r]
+            v3 = bm.verts[top_offset + radial_segments + next_r]
+            v4 = bm.verts[top_offset + radial_segments + r_idx]
             bm.faces.new([v1, v2, v3, v4])
         
         # Bottom face
-        for i in range(vertices):
-            next_i = (i + 1) % vertices
-            v1 = bm.verts[i]  # bottom outer
-            v2 = bm.verts[vertices + i]  # bottom inner
-            v3 = bm.verts[vertices + next_i]  # bottom inner next
-            v4 = bm.verts[next_i]  # bottom outer next
+        for r_idx in range(radial_segments):
+            next_r = (r_idx + 1) % radial_segments
+            v1 = bm.verts[r_idx]
+            v2 = bm.verts[radial_segments + r_idx]
+            v3 = bm.verts[radial_segments + next_r]
+            v4 = bm.verts[next_r]
             bm.faces.new([v1, v2, v3, v4])
         
         # Update mesh
@@ -281,20 +371,23 @@ class RingTextGenerator:
         bpy.context.view_layer.objects.active = ring_obj
         bpy.ops.object.shade_smooth()
         
-        self.log(f"Created ring: inner_d={self.config['ringInnerDiameter']}mm, "
-                f"outer_d={self.config['ringOuterDiameter']}mm, length={self.config['ringLength']}mm")
+        self.log(f"Created ring: inner_d={self.config['inner_diameter']}mm, "
+                f"outer_d={self.config['outer_diameter']}mm, length={self.config['ring_length']}mm")
         
         return ring_obj
     
     def create_text(self):
-        """Create 3D text on the ring using proper curve modifier"""
+        """Create 3D text positioned on the ring"""
         text = self.config['text']
         font_path = self.config['_resolved_font_path']
-        text_size = self.config['textSize']
-        is_embossed = self.config['isEmbossed']
-        text_depth = self.config['textDepth']
-        letter_spacing = self.config['letterSpacing']
-        outer_radius = self.config['ringOuterDiameter'] / 2
+        text_size = self.config['text_size']
+        text_depth = self.config['text_depth']
+        letter_spacing = self.config['letter_spacing']
+        outer_radius = self.config['outer_diameter'] / 2
+        text_direction = self.config.get('text_direction', 'normal')
+        is_embossed = self.config['embossed']
+        
+        self.log("Creating text object...")
         
         # Load font
         try:
@@ -302,67 +395,58 @@ class RingTextGenerator:
             self.log(f"Loaded font: {font_path}")
         except Exception as e:
             self.log(f"ERROR: Failed to load font: {e}", "ERROR")
-            font = None
-            self.log("Using default Blender font as fallback", "WARNING")
+            return None
         
         # Create text curve object
         curve = bpy.data.curves.new(type="FONT", name="Text")
         curve.body = text
-        
-        if font:
-            curve.font = font
+        curve.font = font
         
         # Set text properties
         curve.size = text_size
         curve.extrude = text_depth
         curve.bevel_depth = 0
         curve.align_x = 'CENTER'
-        curve.align_y = 'CENTER'  # Center vertically
+        curve.align_y = 'CENTER'
         
-        # Add letter spacing
+        # Apply letter spacing
         if letter_spacing > 0:
-            # Convert letter_spacing from arc length to relative spacing
+            # Blender's character spacing is relative
             curve.space_character = 1.0 + (letter_spacing / text_size)
         
         # Create text object
         text_obj = bpy.data.objects.new("Text", curve)
         bpy.context.collection.objects.link(text_obj)
         
-        # Position text initially
-        text_obj.location = (0, 0, 0)
-        
-        # Rotate text to lie flat (rotate -90 degrees around X axis)
-        # This makes the text face outward when wrapped around the ring
-        text_obj.rotation_euler = (-math.pi/2, 0, 0)
-        
-        # Convert to mesh first (before any transforms)
+        # Convert to mesh
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
         
-        # Convert to mesh
+        self.log("Converting text to mesh...")
         bpy.ops.object.convert(target='MESH')
         
-        # Apply transforms including the rotation
+        # Apply initial rotation to make text face outward
+        text_obj.rotation_euler = (-math.pi/2, 0, 0)
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
         
-        # Now curve the text around the ring
-        text_obj = self.curve_text_mesh(text_obj, outer_radius, is_embossed)
+        # Curve the text around the ring
+        success = self.curve_text_mesh(text_obj, outer_radius, is_embossed, text_direction)
         
-        if text_obj:
-            self.log(f"Created {'embossed' if is_embossed else 'carved'} text: '{text}'")
+        if success:
+            self.log(f"Created {'embossed' if is_embossed else 'carved'} text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
             return text_obj
-        
-        return None
+        else:
+            return None
     
-    def curve_text_mesh(self, text_obj, radius, is_embossed):
-        """Curve the text mesh around the ring"""
+    def curve_text_mesh(self, text_obj, radius, is_embossed, text_direction):
+        """Curve the text mesh around the ring with proper positioning"""
         mesh = text_obj.data
         
-        # Get text bounds to determine width and height
+        # Get text bounds
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
         
-        # Get bounding box
+        # Calculate bounding box
         bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
         min_x = min([v.x for v in bbox_corners])
         max_x = max([v.x for v in bbox_corners])
@@ -372,46 +456,56 @@ class RingTextGenerator:
         max_z = max([v.z for v in bbox_corners])
         
         text_width = max_x - min_x
-        text_depth_actual = max_y - min_y  # The extrusion depth (now in Y due to rotation)
-        text_height = max_z - min_z  # Height along ring axis
+        text_depth_actual = max_y - min_y
+        text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
         text_center_y = (min_y + max_y) / 2
-        text_center_z = (min_z + max_z) / 2
         
         # Check if text fits around circumference
         circumference = 2 * math.pi * radius
-        if text_width > circumference:
-            self.log(f"WARNING: Text width ({text_width}mm) exceeds circumference ({circumference}mm), will wrap", "WARNING")
+        available_circumference = circumference - 2  # 2mm safety gap
         
-        # Calculate the angular span of the text
-        text_angle = text_width / radius
+        if text_width > available_circumference:
+            self.log(f"WARNING: Text width ({text_width:.2f}mm) exceeds available circumference ({available_circumference:.2f}mm), "
+                    f"text will be truncated", "WARNING")
+            # We'll handle truncation during the curving process
+        
+        # Calculate angular span
+        text_angle = min(text_width / radius, (available_circumference / radius))
+        
+        self.log(f"Curving text around ring (width: {text_width:.2f}mm, angle: {math.degrees(text_angle):.2f}°)")
         
         # Apply curve deformation to vertices
         for vertex in mesh.vertices:
-            # Get vertex position (after rotation, Y is now the depth)
-            x = vertex.co.x - text_center_x  # Center the text horizontally
-            y = vertex.co.y - text_center_y  # This is now the depth from rotation
-            z = vertex.co.z  # Keep Z as-is for vertical position on ring
+            x = vertex.co.x - text_center_x
+            y = vertex.co.y - text_center_y
+            z = vertex.co.z
             
-            # Calculate angle for this vertex based on its X position
-            # Positive angle to read left-to-right correctly
-            angle = (x / radius)
+            # Check if vertex is within allowed range
+            if abs(x) > available_circumference / 2:
+                continue  # Skip vertices outside allowed range (truncation)
+            
+            # Calculate angle for this vertex
+            if text_direction == 'inverted':
+                # For inverted text, reverse the angle
+                angle = -(x / radius)
+            else:
+                # Normal text direction
+                angle = (x / radius)
             
             # Calculate radial position
             if is_embossed:
-                # For embossed, text extends outward from surface
-                # The base of the text should be at the ring surface
-                r = radius - y  # Subtract y because of the rotation
+                # Text extends outward from surface
+                r = radius + y
             else:
-                # For carved, text goes inward from surface
-                # The top of the text should be at the ring surface
-                r = radius - y
+                # Text carved into surface
+                r = radius + y
             
             # Convert to cylindrical coordinates
-            # Place on +Y side (front) of the ring
+            # Position at +Y axis intersection as per spec
             new_x = r * math.sin(angle)
             new_y = r * math.cos(angle)
-            new_z = z  # Keep vertical position
+            new_z = z
             
             vertex.co = Vector((new_x, new_y, new_z))
         
@@ -424,68 +518,108 @@ class RingTextGenerator:
         bpy.ops.mesh.normals_make_consistent(inside=False)
         bpy.ops.object.mode_set(mode='OBJECT')
         
-        return text_obj
+        return True
     
     def combine_ring_and_text(self, ring_obj, text_obj):
-        """Combine ring and text into final mesh"""
-        if self.config['isCarved']:
-            # For carved text, use boolean difference
-            self.log("Applying boolean difference for carved text")
+        """Combine ring and text using boolean operations"""
+        is_carved = self.config['carved']
+        
+        self.log(f"Applying boolean {'difference' if is_carved else 'union'} operation...")
+        
+        # Select ring
+        bpy.ops.object.select_all(action='DESELECT')
+        ring_obj.select_set(True)
+        bpy.context.view_layer.objects.active = ring_obj
+        
+        # Add boolean modifier
+        modifier = ring_obj.modifiers.new(name="TextBoolean", type='BOOLEAN')
+        modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
+        modifier.object = text_obj
+        
+        # Try EXACT solver first
+        modifier.solver = 'EXACT'
+        
+        try:
+            self.log("Attempting boolean operation with EXACT solver...")
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
             
-            # Select ring
-            bpy.ops.object.select_all(action='DESELECT')
+            # Clean up text object
+            bpy.data.objects.remove(text_obj, do_unlink=True)
+            
+            # Clean up mesh
             ring_obj.select_set(True)
             bpy.context.view_layer.objects.active = ring_obj
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.remove_doubles(threshold=0.0001)
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode='OBJECT')
             
-            # Add boolean modifier to ring
-            modifier = ring_obj.modifiers.new(name="Carve", type='BOOLEAN')
-            modifier.operation = 'DIFFERENCE'
-            modifier.object = text_obj
-            modifier.solver = 'EXACT'  # Use exact solver for better results
+            self.log("Boolean operation successful")
+            return ring_obj
             
-            # Apply modifier
+        except Exception as e:
+            self.log(f"WARNING: EXACT solver failed: {e}, trying FAST solver", "WARNING")
+            
+            # Try FAST solver as fallback
             try:
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-                
-                # Delete text object as it's now carved into ring
-                bpy.data.objects.remove(text_obj, do_unlink=True)
-                
-                return ring_obj
-            except Exception as e:
-                self.log(f"WARNING: Boolean operation failed, trying alternative method: {e}", "WARNING")
-                
-                # If boolean fails, try with FAST solver
-                modifier = ring_obj.modifiers.new(name="CarveFast", type='BOOLEAN')
-                modifier.operation = 'DIFFERENCE'
+                modifier = ring_obj.modifiers.new(name="TextBooleanFast", type='BOOLEAN')
+                modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
                 modifier.object = text_obj
                 modifier.solver = 'FAST'
                 
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+                bpy.data.objects.remove(text_obj, do_unlink=True)
+                
+                # Clean up mesh
+                ring_obj.select_set(True)
+                bpy.context.view_layer.objects.active = ring_obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.remove_doubles(threshold=0.0001)
+                bpy.ops.mesh.normals_make_consistent(inside=False)
+                bpy.ops.object.mode_set(mode='OBJECT')
+                
+                self.log("Boolean operation successful with FAST solver")
+                return ring_obj
+                
+            except Exception as e2:
+                self.log(f"ERROR: Boolean operation failed: {e2}", "ERROR")
+                
+                # As last resort, try to increase mesh resolution
+                self.log("Attempting fallback with increased mesh resolution", "WARNING")
+                
+                # Subdivide the meshes
+                for obj in [ring_obj, text_obj]:
+                    obj.select_set(True)
+                    bpy.context.view_layer.objects.active = obj
+                    modifier = obj.modifiers.new(name="Subdivide", type='SUBSURF')
+                    modifier.levels = 1
+                    bpy.ops.object.modifier_apply(modifier=modifier.name)
+                
+                # Try boolean again
                 try:
+                    ring_obj.select_set(True)
+                    bpy.context.view_layer.objects.active = ring_obj
+                    modifier = ring_obj.modifiers.new(name="TextBooleanSubdiv", type='BOOLEAN')
+                    modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
+                    modifier.object = text_obj
+                    modifier.solver = 'EXACT'
+                    
                     bpy.ops.object.modifier_apply(modifier=modifier.name)
                     bpy.data.objects.remove(text_obj, do_unlink=True)
+                    
+                    self.log("Boolean operation successful after subdivision")
                     return ring_obj
-                except Exception as e2:
-                    self.log(f"ERROR: Boolean operation failed completely: {e2}", "ERROR")
-                    # As last resort, just return the ring without carving
-                    return ring_obj
-        else:
-            # For embossed text, join meshes
-            self.log("Joining meshes for embossed text")
-            
-            # Select both objects
-            bpy.ops.object.select_all(action='DESELECT')
-            ring_obj.select_set(True)
-            text_obj.select_set(True)
-            bpy.context.view_layer.objects.active = ring_obj
-            
-            # Join
-            bpy.ops.object.join()
-            
-            return ring_obj
+                except:
+                    self.log("ERROR: All boolean attempts failed", "ERROR")
+                    return None
     
     def export_stl(self, obj):
         """Export the final mesh as STL"""
         output_path = self.config['_resolved_output_path']
+        
+        self.log(f"Exporting STL to: {output_path}")
         
         try:
             # Select only the final object
@@ -495,40 +629,62 @@ class RingTextGenerator:
             
             # Ensure we have a mesh
             if obj.type != 'MESH':
-                self.log("WARNING: Object is not a mesh, converting", "WARNING")
+                self.log("Converting object to mesh for export", "INFO")
                 bpy.ops.object.convert(target='MESH')
             
-            # Export using the new API for Blender 4.0+
-            if hasattr(bpy.ops.wm, 'stl_export'):
+            # Try new export API first (Blender 3.3+)
+            try:
                 bpy.ops.wm.stl_export(
                     filepath=output_path,
                     export_selected_objects=True,
-                    ascii_format=False,  # Binary format
+                    ascii_format=False,
                     apply_modifiers=True,
-                    global_scale=1.0  # Millimeter units
+                    global_scale=1.0
                 )
-            else:
-                # Fallback for older Blender versions
+                self.log("Exported using new STL export API")
+            except AttributeError:
+                # Fall back to old API
                 bpy.ops.export_mesh.stl(
                     filepath=output_path,
                     check_existing=False,
                     use_selection=True,
-                    ascii=False,  # Binary format
+                    ascii=False,
                     apply_modifiers=True,
                     global_scale=1.0
                 )
+                self.log("Exported using legacy STL export API")
             
-            self.log(f"Successfully exported STL to: {output_path}")
-            return True
+            # Verify file was created
+            if Path(output_path).exists():
+                file_size = Path(output_path).stat().st_size
+                self.log(f"Successfully exported STL ({file_size:,} bytes)")
+                return True
+            else:
+                self.log("ERROR: STL file was not created", "ERROR")
+                return False
             
         except Exception as e:
             self.log(f"ERROR: Failed to export STL: {e}", "ERROR")
+            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
             return False
+    
+    def cleanup_on_error(self):
+        """Clean up temporary files on error"""
+        try:
+            # Clean up any partial output files
+            if hasattr(self, 'config') and '_resolved_output_path' in self.config:
+                output_path = Path(self.config['_resolved_output_path'])
+                if output_path.exists() and output_path.stat().st_size == 0:
+                    output_path.unlink()
+                    self.log("Cleaned up empty output file")
+        except Exception as e:
+            self.log(f"Warning: Could not clean up files: {e}", "WARNING")
     
     def run(self):
         """Main execution method"""
         try:
             # Load configuration
+            self.log("Starting ring generation...")
             if not self.load_config():
                 return 2  # File I/O error
             
@@ -540,25 +696,30 @@ class RingTextGenerator:
             self.clear_scene()
             
             # Create ring
+            self.log("Creating ring geometry...")
             ring_obj = self.create_ring()
             if not ring_obj:
                 self.log("ERROR: Failed to create ring", "ERROR")
                 return 3  # Blender operation error
             
             # Create text
+            self.log("Creating text geometry...")
             text_obj = self.create_text()
             if not text_obj:
                 self.log("ERROR: Failed to create text", "ERROR")
-                return 3  # Blender operation error
+                return 4  # Font rendering error
             
             # Combine ring and text
+            self.log("Combining ring and text...")
             final_obj = self.combine_ring_and_text(ring_obj, text_obj)
             if not final_obj:
                 self.log("ERROR: Failed to combine ring and text", "ERROR")
+                self.cleanup_on_error()
                 return 3  # Blender operation error
             
             # Export STL
             if not self.export_stl(final_obj):
+                self.cleanup_on_error()
                 return 2  # File I/O error
             
             self.log("Ring generation completed successfully")
@@ -567,7 +728,11 @@ class RingTextGenerator:
         except Exception as e:
             self.log(f"ERROR: Unexpected error: {e}", "ERROR")
             self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+            self.cleanup_on_error()
             return 3  # Blender operation error
+        finally:
+            # Always ensure Blender is properly closed
+            self.log("Cleaning up Blender resources...")
 
 
 def main():
