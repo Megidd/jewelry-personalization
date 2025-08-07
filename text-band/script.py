@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-script.py - Blender script to create a 3D-printable name ring with flowing script
+script.py - Blender script to create a 3D-printable name ring with readable script
 Runs in Blender with: blender --background --python script.py -- config.json
 """
 
@@ -91,16 +91,18 @@ class RingTextGenerator:
                 self.log(f"ERROR: Missing required field: {field}", "ERROR")
                 return False
         
-        # Set defaults for script-style name ring
-        self.config.setdefault('ring_height', 5.0)  # Height of the text/ring band
-        self.config.setdefault('ring_thickness', 2.0)  # Thickness of the band
-        self.config.setdefault('text_style', 'flowing')  # New parameter for flowing script
+        # Set defaults for name ring style
+        self.config.setdefault('text_height', 5.0)  # Height of text
+        self.config.setdefault('text_thickness', 1.5)  # Thickness/extrusion of text
+        self.config.setdefault('ring_thickness', 2.5)  # Total ring thickness
+        self.config.setdefault('text_position', 'center')  # center, inner, outer
+        self.config.setdefault('repeat_text', True)  # Repeat text around ring
+        self.config.setdefault('text_spacing', 2.0)  # Space between text repetitions
+        self.config.setdefault('connect_letters', True)  # Connect letters smoothly
+        self.config.setdefault('base_ring', False)  # Add thin base ring for support
+        self.config.setdefault('base_ring_height', 1.0)
         self.config.setdefault('radial_segments', 256)
-        self.config.setdefault('vertical_segments', 64)
         self.config.setdefault('create_parent_dirs', True)
-        self.config.setdefault('smooth_connections', True)  # Smooth letter connections
-        self.config.setdefault('add_base_band', False)  # Optional solid band beneath text
-        self.config.setdefault('base_band_height', 1.0)  # Height of base band if enabled
         
         # Validate font path
         font_path = self.config['font_path']
@@ -112,10 +114,6 @@ class RingTextGenerator:
             self.log(f"ERROR: Font file not found: {font_path}", "ERROR")
             return False
         
-        if not font_path.suffix.lower() in ['.ttf', '.otf']:
-            self.log(f"ERROR: Font file must be TTF or OTF format: {font_path}", "ERROR")
-            return False
-        
         self.config['_resolved_font_path'] = str(font_path)
         
         # Validate text
@@ -124,19 +122,18 @@ class RingTextGenerator:
             self.log("ERROR: Text cannot be empty", "ERROR")
             return False
         
-        self.config['text'] = text.replace('', '').replace('\r', '')
+        self.config['text'] = text.strip()
         
-        # Validate ring dimensions
+        # Validate dimensions
         inner_d = self.config['inner_diameter']
-        
         if inner_d <= 0:
-            self.log("ERROR: Ring dimensions must be positive", "ERROR")
+            self.log("ERROR: Inner diameter must be positive", "ERROR")
             return False
         
         if inner_d < 10:
-            self.log(f"WARNING: Inner diameter ({inner_d}mm) is less than recommended minimum of 10mm", "WARNING")
+            self.log(f"WARNING: Inner diameter ({inner_d}mm) is very small", "WARNING")
         
-        # Resolve output file path
+        # Resolve output path
         output_path = self.config['stl_filename']
         if not os.path.isabs(output_path):
             output_path = self.config_dir / output_path
@@ -170,15 +167,20 @@ class RingTextGenerator:
             
         self.log("Scene cleared")
     
-    def create_flowing_name_ring(self):
-        """Create a ring where the text forms the actual band of the ring"""
+    def create_name_ring(self):
+        """Create a ring where text forms a decorative band"""
         text = self.config['text']
         font_path = self.config['_resolved_font_path']
         inner_radius = self.config['inner_diameter'] / 2
-        ring_height = self.config['ring_height']
+        text_height = self.config['text_height']
+        text_thickness = self.config['text_thickness']
         ring_thickness = self.config['ring_thickness']
+        text_spacing = self.config['text_spacing']
         
-        self.log("Creating flowing script name ring...")
+        self.log("Creating name ring with properly positioned text...")
+        
+        # Calculate outer radius based on ring thickness
+        outer_radius = inner_radius + ring_thickness
         
         # Load font
         try:
@@ -188,211 +190,227 @@ class RingTextGenerator:
             self.log(f"ERROR: Failed to load font: {e}", "ERROR")
             return None
         
-        # Create text curve object
-        curve = bpy.data.curves.new(type="FONT", name="NameText")
-        curve.body = text
-        curve.font = font
+        # Create list to hold all text objects
+        text_objects = []
         
-        # Set text properties for flowing script style
-        curve.size = ring_height
-        curve.align_x = 'CENTER'
-        curve.align_y = 'CENTER'
+        # Calculate circumference at the middle of the ring
+        middle_radius = inner_radius + (ring_thickness / 2)
+        circumference = 2 * math.pi * middle_radius
         
-        # Create initial text object
-        text_obj = bpy.data.objects.new("NameText", curve)
-        bpy.context.collection.objects.link(text_obj)
+        # Create initial text to measure its size
+        test_curve = bpy.data.curves.new(type="FONT", name="TestText")
+        test_curve.body = text
+        test_curve.font = font
+        test_curve.size = text_height
+        test_curve.align_x = 'CENTER'
+        test_curve.align_y = 'CENTER'
         
-        # Convert to mesh
-        text_obj.select_set(True)
-        bpy.context.view_layer.objects.active = text_obj
+        test_obj = bpy.data.objects.new("TestText", test_curve)
+        bpy.context.collection.objects.link(test_obj)
         
-        self.log("Converting text to mesh...")
+        # Convert to mesh to get accurate dimensions
+        test_obj.select_set(True)
+        bpy.context.view_layer.objects.active = test_obj
         bpy.ops.object.convert(target='MESH')
         
-        # Center the text
-        bpy.ops.object.origin_set(type='ORIGIN_CENTER_OF_MASS', center='MEDIAN')
-        
-        # Get text width for proper scaling
-        bbox = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
+        # Get text width
+        bbox = [test_obj.matrix_world @ Vector(corner) for corner in test_obj.bound_box]
         text_width = max([v.x for v in bbox]) - min([v.x for v in bbox])
         
-        # Calculate the circumference and required scale
-        circumference = 2 * math.pi * inner_radius
+        # Remove test object
+        bpy.data.objects.remove(test_obj, do_unlink=True)
         
-        # We want the text to wrap around with some overlap for seamless connection
-        # Add slight overlap (10% of text width) for better connection
-        overlap_factor = 1.1
-        scale_factor = circumference / (text_width * overlap_factor)
+        # Calculate how many times text fits around ring
+        total_text_space = text_width + text_spacing
+        num_repetitions = int(circumference / total_text_space)
         
-        # Apply scaling to make text fit circumference
-        text_obj.scale = (scale_factor, 1, 1)
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        if num_repetitions < 1:
+            num_repetitions = 1
+            self.log(f"WARNING: Text is too long for ring, using single instance", "WARNING")
         
-        # Create the ring by bending the text into a circle
-        self.log("Bending text into ring shape...")
-        ring_obj = self.bend_text_into_ring(text_obj, inner_radius, ring_thickness)
+        if not self.config.get('repeat_text', True):
+            num_repetitions = 1
         
-        if ring_obj:
-            # Add optional base band for stability
-            if self.config.get('add_base_band', False):
-                base_band = self.create_base_band(inner_radius, ring_thickness)
-                if base_band:
-                    self.log("Adding base band for stability...")
-                    ring_obj = self.combine_with_base_band(ring_obj, base_band)
+        self.log(f"Placing {num_repetitions} instances of text around ring")
+        
+        # Create text instances around the ring
+        angle_step = (2 * math.pi) / num_repetitions
+        
+        for i in range(num_repetitions):
+            # Create text object
+            curve = bpy.data.curves.new(type="FONT", name=f"Text_{i}")
+            curve.body = text
+            curve.font = font
+            curve.size = text_height
+            curve.align_x = 'CENTER'
+            curve.align_y = 'CENTER'
+            curve.extrude = text_thickness
+            curve.bevel_depth = 0.1  # Small bevel for smoother edges
+            curve.bevel_resolution = 2
             
-            self.log(f"Created flowing name ring with text: '{text}'")
-            return ring_obj
+            text_obj = bpy.data.objects.new(f"Text_{i}", curve)
+            bpy.context.collection.objects.link(text_obj)
+            
+            # Convert to mesh
+            text_obj.select_set(True)
+            bpy.context.view_layer.objects.active = text_obj
+            bpy.ops.object.convert(target='MESH')
+            
+            # Position text
+            angle = i * angle_step
+            
+            # Calculate position based on text_position setting
+            if self.config.get('text_position', 'center') == 'outer':
+                pos_radius = outer_radius - (text_thickness / 2)
+            elif self.config.get('text_position', 'center') == 'inner':
+                pos_radius = inner_radius + (text_thickness / 2)
+            else:  # center
+                pos_radius = middle_radius
+            
+            # Position at the correct angle and radius
+            x = pos_radius * math.cos(angle)
+            y = pos_radius * math.sin(angle)
+            z = 0
+            
+            text_obj.location = (x, y, z)
+            
+            # Rotate to face outward
+            text_obj.rotation_euler = (0, 0, angle - math.pi/2)
+            
+            # Apply transforms
+            bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+            
+            text_objects.append(text_obj)
+        
+        # Join all text objects into one
+        if len(text_objects) > 1:
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in text_objects:
+                obj.select_set(True)
+            bpy.context.view_layer.objects.active = text_objects[0]
+            bpy.ops.object.join()
+            combined_text = bpy.context.active_object
         else:
-            return None
-    
-    def bend_text_into_ring(self, text_obj, radius, thickness):
-        """Bend the linear text mesh into a ring shape"""
-        mesh = text_obj.data
+            combined_text = text_objects[0]
         
-        # Get bounds
-        bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
-        min_x = min([v.x for v in bbox_corners])
-        max_x = max([v.x for v in bbox_corners])
-        min_y = min([v.y for v in bbox_corners])
-        max_y = max([v.y for v in bbox_corners])
-        min_z = min([v.z for v in bbox_corners])
-        max_z = max([v.z for v in bbox_corners])
+        combined_text.name = "NameRingText"
         
-        text_width = max_x - min_x
-        text_height = max_z - min_z
-        text_depth = max_y - min_y
+        # Create connecting geometry if requested
+        if self.config.get('connect_letters', True):
+            self.log("Creating letter connections...")
+            combined_text = self.create_letter_connections(combined_text, middle_radius)
         
-        # Center values
-        center_x = (min_x + max_x) / 2
-        center_y = (min_y + max_y) / 2
-        center_z = (min_z + max_z) / 2
+        # Add base ring if requested
+        if self.config.get('base_ring', False):
+            self.log("Adding base ring...")
+            base_ring = self.create_base_ring(inner_radius, ring_thickness)
+            
+            # Combine with text
+            bpy.ops.object.select_all(action='DESELECT')
+            combined_text.select_set(True)
+            bpy.context.view_layer.objects.active = combined_text
+            
+            modifier = combined_text.modifiers.new(name="BaseRing", type='BOOLEAN')
+            modifier.operation = 'UNION'
+            modifier.object = base_ring
+            modifier.solver = 'EXACT'
+            
+            try:
+                bpy.ops.object.modifier_apply(modifier=modifier.name)
+                bpy.data.objects.remove(base_ring, do_unlink=True)
+            except:
+                self.log("WARNING: Could not apply base ring boolean", "WARNING")
         
-        # First, extrude the text to give it thickness
-        self.log("Adding thickness to text...")
+        # Clean up the mesh
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
-        
-        # Solidify for thickness
-        bpy.ops.object.mode_set(mode='OBJECT')
-        solidify_modifier = text_obj.modifiers.new(name="Solidify", type='SOLIDIFY')
-        solidify_modifier.thickness = thickness
-        solidify_modifier.offset = 0  # Center the thickness
-        solidify_modifier.use_even_offset = True
-        solidify_modifier.use_quality_normals = True
-        
-        # Apply solidify modifier
-        bpy.ops.object.modifier_apply(modifier=solidify_modifier.name)
-        
-        # Now bend into ring shape
-        self.log("Bending into ring shape...")
-        
-        # Apply the cylindrical transformation
-        for vertex in mesh.vertices:
-            # Get original position relative to center
-            x = vertex.co.x - center_x
-            y = vertex.co.y - center_y
-            z = vertex.co.z - center_z
-            
-            # Map X position to angle around the ring
-            # Full text width maps to full circle (2π)
-            angle = (x / text_width) * 2 * math.pi
-            
-            # The radius for this vertex depends on its Y position (depth)
-            # This creates the thickness of the ring
-            vertex_radius = radius + y
-            
-            # Convert to cylindrical coordinates
-            new_x = vertex_radius * math.sin(angle)
-            new_y = vertex_radius * math.cos(angle)
-            new_z = z  # Keep vertical position
-            
-            vertex.co = Vector((new_x, new_y, new_z))
-        
-        # Update mesh
-        mesh.update()
-        
-        # Clean up the seam where the text meets
-        self.log("Cleaning up seam...")
-        bpy.ops.object.mode_set(mode='EDIT')
-        bpy.ops.mesh.select_all(action='SELECT')
-        
-        # Remove doubles to merge vertices at the seam
-        bpy.ops.mesh.remove_doubles(threshold=0.1)
-        
-        # Smooth the mesh for better appearance
-        bpy.ops.mesh.vertices_smooth(factor=0.5, repeat=2)
-        
-        # Recalculate normals
+        bpy.ops.mesh.remove_doubles(threshold=0.01)
         bpy.ops.mesh.normals_make_consistent(inside=False)
-        
         bpy.ops.object.mode_set(mode='OBJECT')
         
         # Apply smooth shading
         bpy.ops.object.shade_smooth()
         
-        # Add subdivision surface for smoother result
-        if self.config.get('smooth_connections', True):
-            subsurf_modifier = text_obj.modifiers.new(name="Subdivision", type='SUBSURF')
-            subsurf_modifier.levels = 1
-            subsurf_modifier.render_levels = 2
-            bpy.ops.object.modifier_apply(modifier=subsurf_modifier.name)
-        
-        return text_obj
+        return combined_text
     
-    def create_base_band(self, radius, thickness):
-        """Create an optional solid band beneath the text"""
-        band_height = self.config.get('base_band_height', 1.0)
+    def create_letter_connections(self, text_obj, radius):
+        """Create smooth connections between letter instances"""
+        # Add a solidify modifier to ensure manifold geometry
+        solidify = text_obj.modifiers.new(name="Solidify", type='SOLIDIFY')
+        solidify.thickness = 0.2
+        solidify.offset = 0
+        bpy.ops.object.modifier_apply(modifier=solidify.name)
         
-        self.log("Creating base band...")
-        
-        # Create a simple torus for the base band
+        # Create a torus that will act as the connecting band
         bpy.ops.mesh.primitive_torus_add(
             major_radius=radius,
-            minor_radius=thickness/2,
-            major_segments=128,
-            minor_segments=32,
-            location=(0, 0, -band_height/2)
+            minor_radius=self.config['text_height'] * 0.15,  # Thin connector
+            major_segments=self.config['radial_segments'],
+            minor_segments=16,
+            location=(0, 0, 0)
         )
         
-        base_band = bpy.context.active_object
-        base_band.name = "BaseBand"
+        connector = bpy.context.active_object
+        connector.name = "Connector"
         
-        # Scale it to be more like a band
-        base_band.scale[2] = band_height / thickness
-        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        
-        return base_band
-    
-    def combine_with_base_band(self, ring_obj, base_band):
-        """Combine the text ring with the base band"""
-        self.log("Combining text with base band...")
-        
-        # Select ring
+        # Combine text with connector
         bpy.ops.object.select_all(action='DESELECT')
-        ring_obj.select_set(True)
-        bpy.context.view_layer.objects.active = ring_obj
+        text_obj.select_set(True)
+        bpy.context.view_layer.objects.active = text_obj
         
-        # Add boolean modifier
-        modifier = ring_obj.modifiers.new(name="BaseBandUnion", type='BOOLEAN')
+        modifier = text_obj.modifiers.new(name="Connect", type='BOOLEAN')
         modifier.operation = 'UNION'
-        modifier.object = base_band
+        modifier.object = connector
         modifier.solver = 'EXACT'
         
         try:
             bpy.ops.object.modifier_apply(modifier=modifier.name)
-            bpy.data.objects.remove(base_band, do_unlink=True)
-            
-            # Clean up
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.mesh.remove_doubles(threshold=0.0001)
-            bpy.ops.mesh.normals_make_consistent(inside=False)
-            bpy.ops.object.mode_set(mode='OBJECT')
-            
-            return ring_obj
-        except Exception as e:
-            self.log(f"WARNING: Could not combine with base band: {e}", "WARNING")
-            return ring_obj
+            bpy.data.objects.remove(connector, do_unlink=True)
+        except:
+            self.log("WARNING: Could not create smooth connections", "WARNING")
+            bpy.data.objects.remove(connector, do_unlink=True)
+        
+        return text_obj
+    
+    def create_base_ring(self, inner_radius, ring_thickness):
+        """Create a thin base ring for structural support"""
+        base_height = self.config.get('base_ring_height', 1.0)
+        
+        # Create cylinder for base ring
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=self.config['radial_segments'],
+            radius=inner_radius + ring_thickness,
+            depth=base_height,
+            location=(0, 0, -self.config['text_height']/2 + base_height/2)
+        )
+        
+        outer_cylinder = bpy.context.active_object
+        
+        # Create inner cylinder to subtract
+        bpy.ops.mesh.primitive_cylinder_add(
+            vertices=self.config['radial_segments'],
+            radius=inner_radius,
+            depth=base_height * 2,
+            location=(0, 0, -self.config['text_height']/2 + base_height/2)
+        )
+        
+        inner_cylinder = bpy.context.active_object
+        
+        # Boolean difference to create ring
+        outer_cylinder.select_set(True)
+        bpy.context.view_layer.objects.active = outer_cylinder
+        
+        modifier = outer_cylinder.modifiers.new(name="MakeRing", type='BOOLEAN')
+        modifier.operation = 'DIFFERENCE'
+        modifier.object = inner_cylinder
+        modifier.solver = 'EXACT'
+        
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        bpy.data.objects.remove(inner_cylinder, do_unlink=True)
+        
+        outer_cylinder.name = "BaseRing"
+        
+        return outer_cylinder
     
     def export_stl(self, obj):
         """Export the final mesh as STL"""
@@ -404,10 +422,6 @@ class RingTextGenerator:
             bpy.ops.object.select_all(action='DESELECT')
             obj.select_set(True)
             bpy.context.view_layer.objects.active = obj
-            
-            if obj.type != 'MESH':
-                self.log("Converting object to mesh for export", "INFO")
-                bpy.ops.object.convert(target='MESH')
             
             # Try new export API first (Blender 3.3+)
             try:
@@ -441,7 +455,6 @@ class RingTextGenerator:
             
         except Exception as e:
             self.log(f"ERROR: Failed to export STL: {e}", "ERROR")
-            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
             return False
     
     def run(self):
@@ -456,9 +469,9 @@ class RingTextGenerator:
             
             self.clear_scene()
             
-            # Create the flowing name ring
-            self.log("Creating flowing name ring...")
-            ring_obj = self.create_flowing_name_ring()
+            # Create the name ring
+            self.log("Creating name ring...")
+            ring_obj = self.create_name_ring()
             if not ring_obj:
                 self.log("ERROR: Failed to create name ring", "ERROR")
                 return 3
@@ -489,7 +502,7 @@ def main():
     argv = argv[argv.index("--") + 1:]
     
     if len(argv) < 1:
-        print("ERROR: No config file specified. Usage: blender --background --python script.py -- config.json")
+        print("ERROR: No config file specified")
         sys.exit(1)
     
     config_path = argv[0]
