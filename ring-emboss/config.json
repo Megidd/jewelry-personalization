@@ -1,16 +1,16 @@
 {
   "ring": {
     "inner_diameter": 18.0,
-    "outer_diameter": 22.0,
-    "length": 6.0,
+    "outer_diameter": 20.0,
+    "length": 3.0,
     "radial_segments": 256,
     "vertical_segments": 64
   },
   "text": {
-    "content": "forever",
+    "content": "forever yours",
     "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
     "font_size": 3.0,
-    "depth": 0.5,
+    "depth": 0.25,
     "direction": "normal"
   },
   "output": {
