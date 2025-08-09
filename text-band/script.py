@@ -108,16 +108,6 @@ class RingTextGenerator:
         # Validate text section
         text_config = self.config['text']
         
-        # Handle backward compatibility - if old fields exist, convert them
-        if 'size' in text_config and 'font_size' not in text_config:
-            text_config['font_size'] = text_config['size']
-            del text_config['size']
-        
-        # Remove letter_spacing if it exists (no longer used)
-        if 'letter_spacing' in text_config:
-            self.log("Note: letter_spacing parameter found but will be ignored (no longer used with cursive fonts)")
-            del text_config['letter_spacing']
-        
         required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'direction']
         
         for field in required_text_fields:
