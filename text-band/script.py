@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-script.py - Blender script to create a 3D-printable ring with custom text
+script.py - Blender script to create a 3D-printable ring with custom embossed text
 Runs in Blender with: blender --background --python script.py -- config.json
 """
 
@@ -118,7 +118,12 @@ class RingTextGenerator:
             self.log("Note: letter_spacing parameter found but will be ignored (no longer used with cursive fonts)")
             del text_config['letter_spacing']
         
-        required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'style', 'direction']
+        # Remove style field if it exists (no longer needed)
+        if 'style' in text_config:
+            self.log("Note: style parameter found but will be ignored (text is always embossed)")
+            del text_config['style']
+        
+        required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'direction']
         
         for field in required_text_fields:
             if field not in text_config:
@@ -207,12 +212,6 @@ class RingTextGenerator:
         elif font_size > length * 0.8:
             self.log(f"WARNING: Font size ({font_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
         
-        # Validate text style
-        text_style = text_config['style']
-        if text_style not in ['embossed', 'carved']:
-            self.log(f"ERROR: Invalid text style '{text_style}', must be 'embossed' or 'carved'", "ERROR")
-            return False
-        
         # Validate text depth
         text_depth = text_config['depth']
         
@@ -220,16 +219,10 @@ class RingTextGenerator:
             self.log("ERROR: Text depth must be positive", "ERROR")
             return False
         
-        # Apply depth capping as per spec
+        # For embossed text, warn if it extends too far
         if text_depth > ring_thickness:
-            if text_style == 'carved':
-                new_depth = ring_thickness * 0.9
-                self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
-                        f"capping to 90% of thickness ({new_depth}mm) to prevent punch-through", "WARNING")
-                text_config['depth'] = new_depth
-            else:  # embossed
-                self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
-                        f"text will extend beyond inner surface", "WARNING")
+            self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
+                    f"text will extend beyond inner surface", "WARNING")
         
         # Recommend 50% or less
         if text_depth > ring_thickness * 0.5:
@@ -401,7 +394,6 @@ class RingTextGenerator:
         text_depth = text_config['depth']
         outer_radius = ring_config['outer_diameter'] / 2
         text_direction = text_config.get('direction', 'normal')
-        is_embossed = text_config['style'] == 'embossed'
         
         self.log("Creating text object...")
         
@@ -444,15 +436,15 @@ class RingTextGenerator:
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
         
         # Curve the text around the ring
-        success = self.curve_text_mesh(text_obj, outer_radius, is_embossed, text_direction)
+        success = self.curve_text_mesh(text_obj, outer_radius, text_direction)
         
         if success:
-            self.log(f"Created {'embossed' if is_embossed else 'carved'} text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
+            self.log(f"Created embossed text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
             return text_obj
         else:
             return None
     
-    def curve_text_mesh(self, text_obj, radius, is_embossed, text_direction):
+    def curve_text_mesh(self, text_obj, radius, text_direction):
         """Curve the text mesh around the ring with proper positioning"""
         text_config = self.config['text']
         mesh = text_obj.data
@@ -476,14 +468,8 @@ class RingTextGenerator:
         text_center_x = (min_x + max_x) / 2
         text_center_z = (min_z + max_z) / 2
         
-        # IMPORTANT: For carved text, we need to position the front face at the surface
         # For embossed text, we need to position the back face at the surface
-        if text_config['style'] == 'carved':
-            # For carved: front of text (max_y) should be at ring surface
-            y_offset = -max_y  # This moves the front face to Y=0
-        else:
-            # For embossed: back of text (min_y) should be at ring surface  
-            y_offset = -min_y  # This moves the back face to Y=0
+        y_offset = -min_y  # This moves the back face to Y=0
         
         # Check if text fits around circumference
         circumference = 2 * math.pi * radius
@@ -518,15 +504,8 @@ class RingTextGenerator:
                 angle = (x / radius)
             
             # Calculate radial position
-            # Now y should be:
-            # - For carved text: 0 at surface, negative values going into the ring
-            # - For embossed text: 0 at surface, positive values extending outward
-            if text_config['style'] == 'carved':
-                # For carved text, subtract from radius (going inward)
-                r = radius + y  # y will be <= 0, so this reduces radius
-            else:
-                # For embossed text, add to radius (going outward)
-                r = radius + y  # y will be >= 0, so this increases radius
+            # For embossed text, add to radius (going outward)
+            r = radius + y  # y will be >= 0, so this increases radius
             
             # Convert to cylindrical coordinates
             # Position at +Y axis intersection as per spec
@@ -546,13 +525,10 @@ class RingTextGenerator:
         bpy.ops.object.mode_set(mode='OBJECT')
         
         return True
-
     
     def combine_ring_and_text(self, ring_obj, text_obj):
-        """Combine ring and text using boolean operations"""
-        is_carved = self.config['text']['style'] == 'carved'
-        
-        self.log(f"Applying boolean {'difference' if is_carved else 'union'} operation...")
+        """Combine ring and text using boolean union operation"""
+        self.log("Applying boolean union operation...")
         
         # Select ring
         bpy.ops.object.select_all(action='DESELECT')
@@ -561,7 +537,7 @@ class RingTextGenerator:
         
         # Add boolean modifier
         modifier = ring_obj.modifiers.new(name="TextBoolean", type='BOOLEAN')
-        modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
+        modifier.operation = 'UNION'
         modifier.object = text_obj
         
         # Try EXACT solver first
@@ -592,7 +568,7 @@ class RingTextGenerator:
             # Try FAST solver as fallback
             try:
                 modifier = ring_obj.modifiers.new(name="TextBooleanFast", type='BOOLEAN')
-                modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
+                modifier.operation = 'UNION'
                 modifier.object = text_obj
                 modifier.solver = 'FAST'
                 
@@ -630,7 +606,7 @@ class RingTextGenerator:
                     ring_obj.select_set(True)
                     bpy.context.view_layer.objects.active = ring_obj
                     modifier = ring_obj.modifiers.new(name="TextBooleanSubdiv", type='BOOLEAN')
-                    modifier.operation = 'DIFFERENCE' if is_carved else 'UNION'
+                    modifier.operation = 'UNION'
                     modifier.object = text_obj
                     modifier.solver = 'EXACT'
                     

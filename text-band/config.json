@@ -7,11 +7,10 @@
     "vertical_segments": 64
   },
   "text": {
-    "content": "FOREVER",
+    "content": "forever",
     "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
     "font_size": 3.0,
     "depth": 0.5,
-    "style": "embossed",
     "direction": "normal"
   },
   "output": {
