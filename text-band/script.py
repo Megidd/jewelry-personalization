@@ -192,17 +192,7 @@ class RingTextGenerator:
         if text_depth <= 0:
             self.log("ERROR: Text depth must be positive", "ERROR")
             return False
-        
-        # For embossed text, warn if it extends too far
-        if text_depth > ring_thickness:
-            self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
-                    f"text will extend beyond inner surface", "WARNING")
-        
-        # Recommend 50% or less
-        if text_depth > ring_thickness * 0.5:
-            self.log(f"WARNING: Text depth ({text_depth}mm) > 50% of ring thickness ({ring_thickness}mm), "
-                    f"consider reducing for structural integrity", "WARNING")
-        
+
         # Validate text direction
         text_direction = text_config.get('direction', 'normal')
         if text_direction not in ['normal', 'inverted']:
