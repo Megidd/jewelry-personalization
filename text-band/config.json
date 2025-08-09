@@ -1,17 +1,12 @@
 {
-    "text": "Shauna",
-    "font_path": "../fonts/TTFs/Miss_Fajardose/MissFajardose-Regular.ttf",
-    "inner_diameter": 18.0,
-    "ring_thickness": 2.5,
-    "ring_width": 8.0,
-    "text_height": 4.0,
-    "text_depth": 0.8,
-    "text_style": "raised",
-    "repeat_text": true,
-    "text_spacing": 1.5,
-    "radial_segments": 128,
-    "stl_filename": "output/name_ring.stl",
-    "log_filename": "output/ring_generation.log",
-    "create_parent_dirs": true
-  }
-  
+  "text": "Emma",
+  "ring_radius": 1.0,
+  "ring_thickness": 0.15,
+  "ring_height": 0.4,
+  "font_size": 4.8,
+  "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
+  "stl_path": "ring_model.stl",
+  "material_color": [0.8, 0.8, 0.8],
+  "metallic": 1.0,
+  "roughness": 0.1
+}
