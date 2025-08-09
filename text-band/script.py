@@ -39,14 +39,14 @@ class RingTextGenerator:
     
     def setup_log_file(self):
         """Initialize log file from config"""
-        if 'log_filename' in self.config:
-            log_path = self.config['log_filename']
+        if 'output' in self.config and 'log_filename' in self.config['output']:
+            log_path = self.config['output']['log_filename']
             if not os.path.isabs(log_path):
                 log_path = self.config_dir / log_path
             self.log_file = Path(log_path)
             
             # Create parent directories if needed and configured
-            if self.config.get('create_parent_dirs', True) and self.log_file.parent:
+            if self.config['output'].get('create_parent_dirs', True) and self.log_file.parent:
                 try:
                     self.log_file.parent.mkdir(parents=True, exist_ok=True)
                 except Exception as e:
@@ -69,6 +69,12 @@ class RingTextGenerator:
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
+            
+            # Convert old format to new format if necessary
+            if 'ring' not in self.config and 'text' not in self.config and 'output' not in self.config:
+                self.log("Converting flat config format to sectioned format...")
+                self.convert_legacy_config()
+            
             self.setup_log_file()
             self.log(f"Successfully loaded config from {self.config_path}")
             return True
@@ -82,28 +88,94 @@ class RingTextGenerator:
             self.log(f"ERROR: Failed to load config: {e}", "ERROR")
             return False
     
+    def convert_legacy_config(self):
+        """Convert old flat config format to new sectioned format"""
+        old_config = self.config
+        self.config = {
+            'ring': {},
+            'text': {},
+            'output': {}
+        }
+        
+        # Ring section
+        ring_fields = ['inner_diameter', 'outer_diameter', 'ring_length', 'radial_segments', 'vertical_segments']
+        for field in ring_fields:
+            if field in old_config:
+                # Rename ring_length to length
+                new_field = 'length' if field == 'ring_length' else field
+                self.config['ring'][new_field] = old_config[field]
+        
+        # Text section
+        text_fields = ['text', 'font_path', 'text_size', 'text_depth', 'letter_spacing', 
+                      'embossed', 'carved', 'text_direction']
+        for field in text_fields:
+            if field in old_config:
+                # Map field names
+                if field == 'text':
+                    self.config['text']['content'] = old_config[field]
+                elif field == 'text_size':
+                    self.config['text']['size'] = old_config[field]
+                elif field == 'text_depth':
+                    self.config['text']['depth'] = old_config[field]
+                elif field == 'embossed' or field == 'carved':
+                    # Convert embossed/carved booleans to style string
+                    if old_config.get('embossed', False):
+                        self.config['text']['style'] = 'embossed'
+                    elif old_config.get('carved', False):
+                        self.config['text']['style'] = 'carved'
+                elif field == 'text_direction':
+                    self.config['text']['direction'] = old_config[field]
+                else:
+                    self.config['text'][field] = old_config[field]
+        
+        # Output section
+        output_fields = ['stl_filename', 'log_filename', 'create_parent_dirs']
+        for field in output_fields:
+            if field in old_config:
+                self.config['output'][field] = old_config[field]
+    
     def validate_config(self):
         """Validate all configuration parameters"""
-        required_fields = [
-            'text', 'font_path', 'text_size', 'text_depth', 'letter_spacing',
-            'embossed', 'carved', 'text_direction',
-            'inner_diameter', 'outer_diameter', 'ring_length',
-            'stl_filename'
-        ]
-        
-        # Check required fields
-        for field in required_fields:
-            if field not in self.config:
-                self.log(f"ERROR: Missing required field: {field}", "ERROR")
+        # Check for required sections
+        required_sections = ['ring', 'text', 'output']
+        for section in required_sections:
+            if section not in self.config:
+                self.log(f"ERROR: Missing required section: {section}", "ERROR")
                 return False
         
-        # Set defaults for optional fields
-        self.config.setdefault('radial_segments', 256)
-        self.config.setdefault('vertical_segments', 64)
-        self.config.setdefault('create_parent_dirs', True)
+        # Validate ring section
+        ring_config = self.config['ring']
+        required_ring_fields = ['inner_diameter', 'outer_diameter', 'length']
+        
+        for field in required_ring_fields:
+            if field not in ring_config:
+                self.log(f"ERROR: Missing required ring field: {field}", "ERROR")
+                return False
+        
+        # Set ring defaults
+        ring_config.setdefault('radial_segments', 256)
+        ring_config.setdefault('vertical_segments', 64)
+        
+        # Validate text section
+        text_config = self.config['text']
+        required_text_fields = ['content', 'font_path', 'size', 'depth', 'letter_spacing', 'style', 'direction']
+        
+        for field in required_text_fields:
+            if field not in text_config:
+                self.log(f"ERROR: Missing required text field: {field}", "ERROR")
+                return False
+        
+        # Validate output section
+        output_config = self.config['output']
+        if 'stl_filename' not in output_config:
+            self.log("ERROR: Missing required output field: stl_filename", "ERROR")
+            return False
+        
+        # Set output defaults
+        output_config.setdefault('create_parent_dirs', True)
         
         # Validate font path
-        font_path = self.config['font_path']
+        font_path = text_config['font_path']
         if not os.path.isabs(font_path):
             font_path = self.config_dir / font_path
         font_path = Path(font_path).resolve()
@@ -116,26 +188,26 @@ class RingTextGenerator:
             self.log(f"ERROR: Font file must be TTF or OTF format: {font_path}", "ERROR")
             return False
         
-        self.config['_resolved_font_path'] = str(font_path)
+        text_config['_resolved_font_path'] = str(font_path)
         
-        # Validate text
-        text = self.config['text']
+        # Validate text content
+        text = text_config['content']
         if not text or len(text.strip()) == 0:
-            self.log("ERROR: Text cannot be empty", "ERROR")
+            self.log("ERROR: Text content cannot be empty", "ERROR")
             return False
         
         # Remove newlines as specified
-        self.config['text'] = text.replace('', '').replace('\r', '')
+        text_config['content'] = text.replace('', '').replace('\r', '')
         
         # Check text length
-        if len(self.config['text']) > 500:
-            self.log(f"ERROR: Text length ({len(self.config['text'])}) exceeds maximum of 500 characters", "ERROR")
+        if len(text_config['content']) > 500:
+            self.log(f"ERROR: Text length ({len(text_config['content'])}) exceeds maximum of 500 characters", "ERROR")
             return False
         
         # Validate ring dimensions
-        inner_d = self.config['inner_diameter']
-        outer_d = self.config['outer_diameter']
-        length = self.config['ring_length']
+        inner_d = ring_config['inner_diameter']
+        outer_d = ring_config['outer_diameter']
+        length = ring_config['length']
         
         if inner_d <= 0 or outer_d <= 0 or length <= 0:
             self.log("ERROR: Ring dimensions must be positive", "ERROR")
@@ -159,7 +231,7 @@ class RingTextGenerator:
             self.log(f"WARNING: Ring thickness ({ring_thickness}mm) is less than recommended minimum of 1.5mm", "WARNING")
         
         # Validate text size
-        text_size = self.config['text_size']
+        text_size = text_config['size']
         if text_size <= 0:
             self.log("ERROR: Text size must be positive", "ERROR")
             return False
@@ -167,7 +239,7 @@ class RingTextGenerator:
         if text_size >= length:
             new_size = length * 0.8
             self.log(f"WARNING: Text size ({text_size}) >= ring length ({length}), capping to {new_size}", "WARNING")
-            self.config['text_size'] = new_size
+            text_config['size'] = new_size
         
         # Check text size range recommendation
         if text_size < length * 0.2:
@@ -175,21 +247,14 @@ class RingTextGenerator:
         elif text_size > length * 0.8:
             self.log(f"WARNING: Text size ({text_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
         
-        # Validate embossed/carved settings
-        is_embossed = self.config['embossed']
-        is_carved = self.config['carved']
-        
-        if is_embossed and is_carved:
-            self.log("ERROR: Cannot have both embossed and carved set to true", "ERROR")
+        # Validate text style
+        text_style = text_config['style']
+        if text_style not in ['embossed', 'carved']:
+            self.log(f"ERROR: Invalid text style '{text_style}', must be 'embossed' or 'carved'", "ERROR")
             return False
         
-        if not is_embossed and not is_carved:
-            self.log("WARNING: Neither embossed nor carved is true, defaulting to embossed", "WARNING")
-            self.config['embossed'] = True
-            self.config['carved'] = False
-        
         # Validate text depth
-        text_depth = self.config['text_depth']
+        text_depth = text_config['depth']
         
         if text_depth <= 0:
             self.log("ERROR: Text depth must be positive", "ERROR")
@@ -197,11 +262,11 @@ class RingTextGenerator:
         
         # Apply depth capping as per spec
         if text_depth > ring_thickness:
-            if self.config['carved']:
+            if text_style == 'carved':
                 new_depth = ring_thickness * 0.9
                 self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
                         f"capping to 90% of thickness ({new_depth}mm) to prevent punch-through", "WARNING")
-                self.config['text_depth'] = new_depth
+                text_config['depth'] = new_depth
             else:  # embossed
                 self.log(f"WARNING: Text depth ({text_depth}mm) > ring thickness ({ring_thickness}mm), "
                         f"text will extend beyond inner surface", "WARNING")
@@ -212,7 +277,7 @@ class RingTextGenerator:
                     f"consider reducing for structural integrity", "WARNING")
         
         # Validate letter spacing
-        letter_spacing = self.config['letter_spacing']
+        letter_spacing = text_config['letter_spacing']
         ring_circumference = math.pi * outer_d
         
         if letter_spacing < 0:
@@ -224,14 +289,14 @@ class RingTextGenerator:
             return False
         
         # Validate text direction
-        text_direction = self.config.get('text_direction', 'normal')
+        text_direction = text_config.get('direction', 'normal')
         if text_direction not in ['normal', 'inverted']:
-            self.log(f"ERROR: Invalid text_direction '{text_direction}', must be 'normal' or 'inverted'", "ERROR")
+            self.log(f"ERROR: Invalid text direction '{text_direction}', must be 'normal' or 'inverted'", "ERROR")
             return False
         
         # Validate segment counts
-        radial_segments = self.config['radial_segments']
-        vertical_segments = self.config['vertical_segments']
+        radial_segments = ring_config['radial_segments']
+        vertical_segments = ring_config['vertical_segments']
         
         if radial_segments < 128:
             self.log(f"ERROR: radial_segments ({radial_segments}) must be >= 128", "ERROR")
@@ -242,14 +307,14 @@ class RingTextGenerator:
             return False
         
         # Resolve output file path
-        output_path = self.config['stl_filename']
+        output_path = output_config['stl_filename']
         if not os.path.isabs(output_path):
             output_path = self.config_dir / output_path
-        self.config['_resolved_output_path'] = str(Path(output_path).resolve())
+        output_config['_resolved_output_path'] = str(Path(output_path).resolve())
         
         # Create parent directories if needed
-        output_dir = Path(self.config['_resolved_output_path']).parent
-        if self.config.get('create_parent_dirs', True) and output_dir:
+        output_dir = Path(output_config['_resolved_output_path']).parent
+        if output_config.get('create_parent_dirs', True) and output_dir:
             try:
                 output_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
@@ -281,11 +346,12 @@ class RingTextGenerator:
     
     def create_ring(self):
         """Create the ring cylinder mesh"""
-        inner_radius = self.config['inner_diameter'] / 2
-        outer_radius = self.config['outer_diameter'] / 2
-        length = self.config['ring_length']
-        radial_segments = self.config['radial_segments']
-        vertical_segments = self.config['vertical_segments']
+        ring_config = self.config['ring']
+        inner_radius = ring_config['inner_diameter'] / 2
+        outer_radius = ring_config['outer_diameter'] / 2
+        length = ring_config['length']
+        radial_segments = ring_config['radial_segments']
+        vertical_segments = ring_config['vertical_segments']
         
         self.log(f"Creating ring mesh with {radial_segments} radial and {vertical_segments} vertical segments...")
         
@@ -371,21 +437,24 @@ class RingTextGenerator:
         bpy.context.view_layer.objects.active = ring_obj
         bpy.ops.object.shade_smooth()
         
-        self.log(f"Created ring: inner_d={self.config['inner_diameter']}mm, "
-                f"outer_d={self.config['outer_diameter']}mm, length={self.config['ring_length']}mm")
+        self.log(f"Created ring: inner_d={ring_config['inner_diameter']}mm, "
+                f"outer_d={ring_config['outer_diameter']}mm, length={ring_config['length']}mm")
         
         return ring_obj
     
     def create_text(self):
         """Create 3D text positioned on the ring"""
-        text = self.config['text']
-        font_path = self.config['_resolved_font_path']
-        text_size = self.config['text_size']
-        text_depth = self.config['text_depth']
-        letter_spacing = self.config['letter_spacing']
-        outer_radius = self.config['outer_diameter'] / 2
-        text_direction = self.config.get('text_direction', 'normal')
-        is_embossed = self.config['embossed']
+        text_config = self.config['text']
+        ring_config = self.config['ring']
+        
+        text = text_config['content']
+        font_path = text_config['_resolved_font_path']
+        text_size = text_config['size']
+        text_depth = text_config['depth']
+        letter_spacing = text_config['letter_spacing']
+        outer_radius = ring_config['outer_diameter'] / 2
+        text_direction = text_config.get('direction', 'normal')
+        is_embossed = text_config['style'] == 'embossed'
         
         self.log("Creating text object...")
         
@@ -440,6 +509,7 @@ class RingTextGenerator:
     
     def curve_text_mesh(self, text_obj, radius, is_embossed, text_direction):
         """Curve the text mesh around the ring with proper positioning"""
+        text_config = self.config['text']
         mesh = text_obj.data
         
         # Get text bounds
@@ -463,7 +533,7 @@ class RingTextGenerator:
         
         # IMPORTANT: For carved text, we need to position the front face at the surface
         # For embossed text, we need to position the back face at the surface
-        if self.config['carved']:
+        if text_config['style'] == 'carved':
             # For carved: front of text (max_y) should be at ring surface
             y_offset = -max_y  # This moves the front face to Y=0
         else:
@@ -506,7 +576,7 @@ class RingTextGenerator:
             # Now y should be:
             # - For carved text: 0 at surface, negative values going into the ring
             # - For embossed text: 0 at surface, positive values extending outward
-            if self.config['carved']:
+            if text_config['style'] == 'carved':
                 # For carved text, subtract from radius (going inward)
                 r = radius + y  # y will be <= 0, so this reduces radius
             else:
@@ -535,7 +605,7 @@ class RingTextGenerator:
     
     def combine_ring_and_text(self, ring_obj, text_obj):
         """Combine ring and text using boolean operations"""
-        is_carved = self.config['carved']
+        is_carved = self.config['text']['style'] == 'carved'
         
         self.log(f"Applying boolean {'difference' if is_carved else 'union'} operation...")
         
@@ -630,7 +700,7 @@ class RingTextGenerator:
     
     def export_stl(self, obj):
         """Export the final mesh as STL"""
-        output_path = self.config['_resolved_output_path']
+        output_path = self.config['output']['_resolved_output_path']
         
         self.log(f"Exporting STL to: {output_path}")
         
@@ -685,8 +755,8 @@ class RingTextGenerator:
         """Clean up temporary files on error"""
         try:
             # Clean up any partial output files
-            if hasattr(self, 'config') and '_resolved_output_path' in self.config:
-                output_path = Path(self.config['_resolved_output_path'])
+            if hasattr(self, 'config') and 'output' in self.config and '_resolved_output_path' in self.config['output']:
+                output_path = Path(self.config['output']['_resolved_output_path'])
                 if output_path.exists() and output_path.stat().st_size == 0:
                     output_path.unlink()
                     self.log("Cleaned up empty output file")

@@ -1,18 +1,23 @@
 {
-  "text": "FOREVER",
-  "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
-  "text_size": 3.0,
-  "text_depth": 0.5,
-  "letter_spacing": 0.5,
-  "embossed": true,
-  "carved": false,
-  "text_direction": "normal",
-  "inner_diameter": 18.0,
-  "outer_diameter": 22.0,
-  "ring_length": 6.0,
-  "radial_segments": 256,
-  "vertical_segments": 64,
-  "stl_filename": "output/custom_ring.stl",
-  "log_filename": "output/ring_generation.log",
-  "create_parent_dirs": true
+  "ring": {
+    "inner_diameter": 18.0,
+    "outer_diameter": 22.0,
+    "length": 6.0,
+    "radial_segments": 256,
+    "vertical_segments": 64
+  },
+  "text": {
+    "content": "FOREVER",
+    "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
+    "size": 3.0,
+    "depth": 0.5,
+    "letter_spacing": 0.5,
+    "style": "embossed",
+    "direction": "normal"
+  },
+  "output": {
+    "stl_filename": "output/custom_ring.stl",
+    "log_filename": "output/ring_generation.log",
+    "create_parent_dirs": true
+  }
 }
