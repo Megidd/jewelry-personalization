@@ -1,12 +1,16 @@
 {
-  "text": "Emma",
-  "ring_radius": 1.0,
-  "ring_thickness": 0.15,
-  "ring_height": 0.4,
-  "font_size": 4.8,
-  "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
-  "stl_path": "ring_model.stl",
-  "material_color": [0.8, 0.8, 0.8],
-  "metallic": 1.0,
-  "roughness": 0.1
+  "ring": {
+      "inner_radius": 0.9,
+      "outer_radius": 1.0,
+      "height": 0.2
+  },
+  "text": {
+      "content": "LOVE",
+      "font_size": 0.15,
+      "extrude_depth": 0.03,
+      "operation": "UNION"
+  },
+  "output": {
+      "stl_file": "ring_with_text.stl"
+  }
 }
