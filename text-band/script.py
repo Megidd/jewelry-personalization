@@ -114,7 +114,7 @@ class RingTextGenerator:
                 if field == 'text':
                     self.config['text']['content'] = old_config[field]
                 elif field == 'text_size':
-                    self.config['text']['size'] = old_config[field]
+                    self.config['text']['font_size'] = old_config[field]  # Changed to font_size
                 elif field == 'text_depth':
                     self.config['text']['depth'] = old_config[field]
                 elif field == 'embossed' or field == 'carved':
@@ -125,7 +125,7 @@ class RingTextGenerator:
                         self.config['text']['style'] = 'carved'
                 elif field == 'text_direction':
                     self.config['text']['direction'] = old_config[field]
-                else:
+                elif field != 'letter_spacing':  # Skip letter_spacing in conversion
                     self.config['text'][field] = old_config[field]
         
         # Output section
@@ -158,7 +158,18 @@ class RingTextGenerator:
         
         # Validate text section
         text_config = self.config['text']
-        required_text_fields = ['content', 'font_path', 'size', 'depth', 'letter_spacing', 'style', 'direction']
+        
+        # Handle backward compatibility - if old fields exist, convert them
+        if 'size' in text_config and 'font_size' not in text_config:
+            text_config['font_size'] = text_config['size']
+            del text_config['size']
+        
+        # Remove letter_spacing if it exists (no longer used)
+        if 'letter_spacing' in text_config:
+            self.log("Note: letter_spacing parameter found but will be ignored (no longer used with cursive fonts)")
+            del text_config['letter_spacing']
+        
+        required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'style', 'direction']
         
         for field in required_text_fields:
             if field not in text_config:
@@ -230,22 +241,22 @@ class RingTextGenerator:
         if ring_thickness < 1.5:
             self.log(f"WARNING: Ring thickness ({ring_thickness}mm) is less than recommended minimum of 1.5mm", "WARNING")
         
-        # Validate text size
-        text_size = text_config['size']
-        if text_size <= 0:
-            self.log("ERROR: Text size must be positive", "ERROR")
+        # Validate font_size
+        font_size = text_config['font_size']
+        if font_size <= 0:
+            self.log("ERROR: Font size must be positive", "ERROR")
             return False
         
-        if text_size >= length:
+        if font_size >= length:
             new_size = length * 0.8
-            self.log(f"WARNING: Text size ({text_size}) >= ring length ({length}), capping to {new_size}", "WARNING")
-            text_config['size'] = new_size
+            self.log(f"WARNING: Font size ({font_size}) >= ring length ({length}), capping to {new_size}", "WARNING")
+            text_config['font_size'] = new_size
         
-        # Check text size range recommendation
-        if text_size < length * 0.2:
-            self.log(f"WARNING: Text size ({text_size}mm) is less than 20% of ring length ({length}mm)", "WARNING")
-        elif text_size > length * 0.8:
-            self.log(f"WARNING: Text size ({text_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
+        # Check font size range recommendation
+        if font_size < length * 0.2:
+            self.log(f"WARNING: Font size ({font_size}mm) is less than 20% of ring length ({length}mm)", "WARNING")
+        elif font_size > length * 0.8:
+            self.log(f"WARNING: Font size ({font_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
         
         # Validate text style
         text_style = text_config['style']
@@ -275,18 +286,6 @@ class RingTextGenerator:
         if text_depth > ring_thickness * 0.5:
             self.log(f"WARNING: Text depth ({text_depth}mm) > 50% of ring thickness ({ring_thickness}mm), "
                     f"consider reducing for structural integrity", "WARNING")
-        
-        # Validate letter spacing
-        letter_spacing = text_config['letter_spacing']
-        ring_circumference = math.pi * outer_d
-        
-        if letter_spacing < 0:
-            self.log(f"ERROR: Letter spacing ({letter_spacing}) cannot be negative", "ERROR")
-            return False
-        
-        if letter_spacing >= ring_circumference:
-            self.log(f"ERROR: Letter spacing ({letter_spacing}mm) >= ring circumference ({ring_circumference:.2f}mm)", "ERROR")
-            return False
         
         # Validate text direction
         text_direction = text_config.get('direction', 'normal')
@@ -449,9 +448,8 @@ class RingTextGenerator:
         
         text = text_config['content']
         font_path = text_config['_resolved_font_path']
-        text_size = text_config['size']
+        font_size = text_config['font_size']
         text_depth = text_config['depth']
-        letter_spacing = text_config['letter_spacing']
         outer_radius = ring_config['outer_diameter'] / 2
         text_direction = text_config.get('direction', 'normal')
         is_embossed = text_config['style'] == 'embossed'
@@ -472,16 +470,14 @@ class RingTextGenerator:
         curve.font = font
         
         # Set text properties
-        curve.size = text_size
+        curve.size = font_size
         curve.extrude = text_depth
         curve.bevel_depth = 0
         curve.align_x = 'CENTER'
         curve.align_y = 'CENTER'
         
-        # Apply letter spacing
-        if letter_spacing > 0:
-            # Blender's character spacing is relative
-            curve.space_character = 1.0 + (letter_spacing / text_size)
+        # No letter spacing adjustment - let the font handle natural spacing
+        # This preserves cursive connections
         
         # Create text object
         text_obj = bpy.data.objects.new("Text", curve)

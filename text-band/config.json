@@ -9,9 +9,8 @@
   "text": {
     "content": "FOREVER",
     "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
-    "size": 3.0,
+    "font_size": 3.0,
     "depth": 0.5,
-    "letter_spacing": 0.5,
     "style": "embossed",
     "direction": "normal"
   },
