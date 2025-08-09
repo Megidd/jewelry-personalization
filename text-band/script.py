@@ -70,11 +70,6 @@ class RingTextGenerator:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 self.config = json.load(f)
             
-            # Convert old format to new format if necessary
-            if 'ring' not in self.config and 'text' not in self.config and 'output' not in self.config:
-                self.log("Converting flat config format to sectioned format...")
-                self.convert_legacy_config()
-            
             self.setup_log_file()
             self.log(f"Successfully loaded config from {self.config_path}")
             return True
@@ -87,52 +82,6 @@ class RingTextGenerator:
         except Exception as e:
             self.log(f"ERROR: Failed to load config: {e}", "ERROR")
             return False
-    
-    def convert_legacy_config(self):
-        """Convert old flat config format to new sectioned format"""
-        old_config = self.config
-        self.config = {
-            'ring': {},
-            'text': {},
-            'output': {}
-        }
-        
-        # Ring section
-        ring_fields = ['inner_diameter', 'outer_diameter', 'ring_length', 'radial_segments', 'vertical_segments']
-        for field in ring_fields:
-            if field in old_config:
-                # Rename ring_length to length
-                new_field = 'length' if field == 'ring_length' else field
-                self.config['ring'][new_field] = old_config[field]
-        
-        # Text section
-        text_fields = ['text', 'font_path', 'text_size', 'text_depth', 'letter_spacing', 
-                      'embossed', 'carved', 'text_direction']
-        for field in text_fields:
-            if field in old_config:
-                # Map field names
-                if field == 'text':
-                    self.config['text']['content'] = old_config[field]
-                elif field == 'text_size':
-                    self.config['text']['font_size'] = old_config[field]  # Changed to font_size
-                elif field == 'text_depth':
-                    self.config['text']['depth'] = old_config[field]
-                elif field == 'embossed' or field == 'carved':
-                    # Convert embossed/carved booleans to style string
-                    if old_config.get('embossed', False):
-                        self.config['text']['style'] = 'embossed'
-                    elif old_config.get('carved', False):
-                        self.config['text']['style'] = 'carved'
-                elif field == 'text_direction':
-                    self.config['text']['direction'] = old_config[field]
-                elif field != 'letter_spacing':  # Skip letter_spacing in conversion
-                    self.config['text'][field] = old_config[field]
-        
-        # Output section
-        output_fields = ['stl_filename', 'log_filename', 'create_parent_dirs']
-        for field in output_fields:
-            if field in old_config:
-                self.config['output'][field] = old_config[field]
     
     def validate_config(self):
         """Validate all configuration parameters"""
