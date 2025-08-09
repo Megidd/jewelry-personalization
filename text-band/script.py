@@ -196,17 +196,6 @@ class RingTextGenerator:
             self.log("ERROR: Font size must be positive", "ERROR")
             return False
         
-        if font_size >= length:
-            new_size = length * 0.8
-            self.log(f"WARNING: Font size ({font_size}) >= ring length ({length}), capping to {new_size}", "WARNING")
-            text_config['font_size'] = new_size
-        
-        # Check font size range recommendation
-        if font_size < length * 0.2:
-            self.log(f"WARNING: Font size ({font_size}mm) is less than 20% of ring length ({length}mm)", "WARNING")
-        elif font_size > length * 0.8:
-            self.log(f"WARNING: Font size ({font_size}mm) is greater than 80% of ring length ({length}mm)", "WARNING")
-        
         # Validate text depth
         text_depth = text_config['depth']
         
