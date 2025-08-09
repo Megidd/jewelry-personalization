@@ -522,97 +522,79 @@ class RingTextGenerator:
         return True
     
     def combine_ring_and_text(self, ring_obj, text_obj):
-        """Combine ring and text using boolean union operation"""
-        self.log("Applying boolean union operation...")
-        
-        # Select ring
-        bpy.ops.object.select_all(action='DESELECT')
-        ring_obj.select_set(True)
-        bpy.context.view_layer.objects.active = ring_obj
-        
-        # Add boolean modifier
-        modifier = ring_obj.modifiers.new(name="TextBoolean", type='BOOLEAN')
-        modifier.operation = 'UNION'
-        modifier.object = text_obj
-        
-        # Try EXACT solver first
-        modifier.solver = 'EXACT'
+        """Combine ring and text by merging meshes directly"""
+        self.log("Merging ring and text meshes...")
         
         try:
-            self.log("Attempting boolean operation with EXACT solver...")
-            bpy.ops.object.modifier_apply(modifier=modifier.name)
+            # Get the mesh data
+            ring_mesh = ring_obj.data
+            text_mesh = text_obj.data
             
-            # Clean up text object
-            bpy.data.objects.remove(text_obj, do_unlink=True)
+            # Create a new mesh for the combined result
+            combined_mesh = bpy.data.meshes.new(name="CombinedRing")
             
-            # Clean up mesh
-            ring_obj.select_set(True)
-            bpy.context.view_layer.objects.active = ring_obj
+            # Get vertex and face data from both meshes
+            ring_verts = [(v.co.x, v.co.y, v.co.z) for v in ring_mesh.vertices]
+            text_verts = [(v.co.x, v.co.y, v.co.z) for v in text_mesh.vertices]
+            
+            # Combine vertices
+            all_verts = ring_verts + text_verts
+            
+            # Get faces from ring mesh
+            ring_faces = []
+            for poly in ring_mesh.polygons:
+                face = [v for v in poly.vertices]
+                ring_faces.append(face)
+            
+            # Get faces from text mesh and offset indices
+            text_faces = []
+            vertex_offset = len(ring_verts)
+            for poly in text_mesh.polygons:
+                face = [v + vertex_offset for v in poly.vertices]
+                text_faces.append(face)
+            
+            # Combine faces
+            all_faces = ring_faces + text_faces
+            
+            # Create the combined mesh
+            combined_mesh.from_pydata(all_verts, [], all_faces)
+            combined_mesh.update()
+            
+            # Create new object with combined mesh
+            combined_obj = bpy.data.objects.new("FinalRing", combined_mesh)
+            bpy.context.collection.objects.link(combined_obj)
+            
+            # Copy materials if any
+            if len(ring_obj.data.materials) > 0:
+                for mat in ring_obj.data.materials:
+                    combined_obj.data.materials.append(mat)
+            
+            # Select and make active
+            bpy.ops.object.select_all(action='DESELECT')
+            combined_obj.select_set(True)
+            bpy.context.view_layer.objects.active = combined_obj
+            
+            # Clean up duplicate vertices at boundaries (optional but recommended)
             bpy.ops.object.mode_set(mode='EDIT')
             bpy.ops.mesh.select_all(action='SELECT')
             bpy.ops.mesh.remove_doubles(threshold=0.0001)
             bpy.ops.mesh.normals_make_consistent(inside=False)
             bpy.ops.object.mode_set(mode='OBJECT')
             
-            self.log("Boolean operation successful")
-            return ring_obj
+            # Apply smooth shading
+            bpy.ops.object.shade_smooth()
+            
+            # Delete the original objects
+            bpy.data.objects.remove(ring_obj, do_unlink=True)
+            bpy.data.objects.remove(text_obj, do_unlink=True)
+            
+            self.log(f"Successfully merged meshes: {len(all_verts)} vertices, {len(all_faces)} faces")
+            return combined_obj
             
         except Exception as e:
-            self.log(f"WARNING: EXACT solver failed: {e}, trying FAST solver", "WARNING")
-            
-            # Try FAST solver as fallback
-            try:
-                modifier = ring_obj.modifiers.new(name="TextBooleanFast", type='BOOLEAN')
-                modifier.operation = 'UNION'
-                modifier.object = text_obj
-                modifier.solver = 'FAST'
-                
-                bpy.ops.object.modifier_apply(modifier=modifier.name)
-                bpy.data.objects.remove(text_obj, do_unlink=True)
-                
-                # Clean up mesh
-                ring_obj.select_set(True)
-                bpy.context.view_layer.objects.active = ring_obj
-                bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.select_all(action='SELECT')
-                bpy.ops.mesh.remove_doubles(threshold=0.0001)
-                bpy.ops.mesh.normals_make_consistent(inside=False)
-                bpy.ops.object.mode_set(mode='OBJECT')
-                
-                self.log("Boolean operation successful with FAST solver")
-                return ring_obj
-                
-            except Exception as e2:
-                self.log(f"ERROR: Boolean operation failed: {e2}", "ERROR")
-                
-                # As last resort, try to increase mesh resolution
-                self.log("Attempting fallback with increased mesh resolution", "WARNING")
-                
-                # Subdivide the meshes
-                for obj in [ring_obj, text_obj]:
-                    obj.select_set(True)
-                    bpy.context.view_layer.objects.active = obj
-                    modifier = obj.modifiers.new(name="Subdivide", type='SUBSURF')
-                    modifier.levels = 1
-                    bpy.ops.object.modifier_apply(modifier=modifier.name)
-                
-                # Try boolean again
-                try:
-                    ring_obj.select_set(True)
-                    bpy.context.view_layer.objects.active = ring_obj
-                    modifier = ring_obj.modifiers.new(name="TextBooleanSubdiv", type='BOOLEAN')
-                    modifier.operation = 'UNION'
-                    modifier.object = text_obj
-                    modifier.solver = 'EXACT'
-                    
-                    bpy.ops.object.modifier_apply(modifier=modifier.name)
-                    bpy.data.objects.remove(text_obj, do_unlink=True)
-                    
-                    self.log("Boolean operation successful after subdivision")
-                    return ring_obj
-                except:
-                    self.log("ERROR: All boolean attempts failed", "ERROR")
-                    return None
+            self.log(f"ERROR: Failed to merge meshes: {e}", "ERROR")
+            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+            return None
     
     def export_stl(self, obj):
         """Export the final mesh as STL"""
