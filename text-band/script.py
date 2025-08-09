@@ -118,11 +118,6 @@ class RingTextGenerator:
             self.log("Note: letter_spacing parameter found but will be ignored (no longer used with cursive fonts)")
             del text_config['letter_spacing']
         
-        # Remove style field if it exists (no longer needed)
-        if 'style' in text_config:
-            self.log("Note: style parameter found but will be ignored (text is always embossed)")
-            del text_config['style']
-        
         required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'direction']
         
         for field in required_text_fields:
