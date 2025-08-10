@@ -14,8 +14,8 @@
     "direction": "normal"
   },
   "material": {
-    "name": "PLA",
-    "density": 1.24
+    "name": "GOLD g/cm³",
+    "density": 19.3
   },
   "output": {
     "stl_filename": "output/custom_ring.stl",
