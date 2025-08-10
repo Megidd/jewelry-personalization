@@ -490,6 +490,57 @@ class RingTextGenerator:
         
         return True
     
+    def calculate_mesh_volume(self, mesh_obj):
+        """Calculate the volume of a mesh object using bmesh"""
+        try:
+            # Get the mesh data
+            mesh = mesh_obj.data
+            
+            # Create bmesh from mesh
+            bm = bmesh.new()
+            bm.from_mesh(mesh)
+            
+            # Ensure mesh is triangulated for accurate volume calculation
+            bmesh.ops.triangulate(bm, faces=bm.faces[:])
+            
+            # Calculate volume using the divergence theorem
+            # Volume = (1/3) * sum of (face_normal · face_center) * face_area
+            volume = 0.0
+            
+            for face in bm.faces:
+                # Get face center
+                center = face.calc_center_median()
+                
+                # Get face normal
+                normal = face.normal
+                
+                # Get face area
+                area = face.calc_area()
+                
+                # Add contribution to volume
+                # The dot product gives us the signed distance from origin
+                volume += (center.dot(normal) * area) / 3.0
+            
+            # Clean up
+            bm.free()
+            
+            # Convert to positive value (in case normals were flipped)
+            volume = abs(volume)
+            
+            # Convert from cubic Blender units to cubic millimeters
+            # (assuming 1 Blender unit = 1mm as per the script design)
+            volume_mm3 = volume
+            
+            # Also calculate in cubic centimeters for easier reading
+            volume_cm3 = volume_mm3 / 1000.0
+            
+            return volume_mm3, volume_cm3
+            
+        except Exception as e:
+            self.log(f"ERROR: Failed to calculate volume: {e}", "ERROR")
+            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+            return None, None
+    
     def combine_ring_and_text(self, ring_obj, text_obj):
         """Combine ring and text by merging meshes directly"""
         self.log("Merging ring and text meshes...")
@@ -569,6 +620,26 @@ class RingTextGenerator:
         """Export the final mesh as STL"""
         output_path = self.config['output']['_resolved_output_path']
         
+        # Calculate volume before export
+        self.log("Calculating mesh volume...")
+        volume_mm3, volume_cm3 = self.calculate_mesh_volume(obj)
+        
+        if volume_mm3 is not None:
+            self.log(f"Mesh volume: {volume_mm3:.2f} mm³ ({volume_cm3:.3f} cm³)")
+            
+            # Also log some useful derived information
+            # Assuming common 3D printing materials
+            pla_density = 1.24  # g/cm³
+            abs_density = 1.05  # g/cm³
+            petg_density = 1.27  # g/cm³
+            
+            self.log("Estimated material weight:")
+            self.log(f"  - PLA: {volume_cm3 * pla_density:.2f} g")
+            self.log(f"  - ABS: {volume_cm3 * abs_density:.2f} g")
+            self.log(f"  - PETG: {volume_cm3 * petg_density:.2f} g")
+        else:
+            self.log("WARNING: Could not calculate mesh volume", "WARNING")
+        
         self.log(f"Exporting STL to: {output_path}")
         
         try:
@@ -608,6 +679,16 @@ class RingTextGenerator:
             if Path(output_path).exists():
                 file_size = Path(output_path).stat().st_size
                 self.log(f"Successfully exported STL ({file_size:,} bytes)")
+                
+                # Log final summary
+                self.log("-" * 60)
+                self.log("EXPORT SUMMARY:")
+                self.log(f"  Output file: {output_path}")
+                self.log(f"  File size: {file_size:,} bytes")
+                if volume_mm3 is not None:
+                    self.log(f"  Volume: {volume_mm3:.2f} mm³ ({volume_cm3:.3f} cm³)")
+                self.log("-" * 60)
+                
                 return True
             else:
                 self.log("ERROR: STL file was not created", "ERROR")
