@@ -22,6 +22,7 @@ class RingTextGenerator:
         self.config = None
         self.log_messages = []
         self.log_file = None
+        self.report_data = {}  # Store data for JSON report
         
     def log(self, message, level="INFO"):
         """Log message to console and file"""
@@ -124,6 +125,24 @@ class RingTextGenerator:
         # Set output defaults
         output_config.setdefault('create_parent_dirs', True)
         
+        # Validate material section if present
+        if 'material' in self.config:
+            material_config = self.config['material']
+            # Set default density if not specified (PLA default)
+            material_config.setdefault('density', 1.24)  # g/cm³
+            material_config.setdefault('name', 'PLA')
+            
+            # Validate density
+            if material_config['density'] <= 0:
+                self.log("ERROR: Material density must be positive", "ERROR")
+                return False
+        else:
+            # Create default material config
+            self.config['material'] = {
+                'name': 'PLA',
+                'density': 1.24  # g/cm³
+            }
+        
         # Validate font path
         font_path = text_config['font_path']
         if not os.path.isabs(font_path):
@@ -211,11 +230,18 @@ class RingTextGenerator:
             self.log(f"ERROR: vertical_segments ({vertical_segments}) must be >= 32", "ERROR")
             return False
         
-        # Resolve output file path
+        # Resolve output file paths
         output_path = output_config['stl_filename']
         if not os.path.isabs(output_path):
             output_path = self.config_dir / output_path
         output_config['_resolved_output_path'] = str(Path(output_path).resolve())
+        
+        # Resolve report file path if specified
+        if 'report_filename' in output_config:
+            report_path = output_config['report_filename']
+            if not os.path.isabs(report_path):
+                report_path = self.config_dir / report_path
+            output_config['_resolved_report_path'] = str(Path(report_path).resolve())
         
         # Create parent directories if needed
         output_dir = Path(output_config['_resolved_output_path']).parent
@@ -225,6 +251,16 @@ class RingTextGenerator:
             except Exception as e:
                 self.log(f"ERROR: Could not create output directory: {e}", "ERROR")
                 return False
+        
+        # Create report directory if needed
+        if '_resolved_report_path' in output_config:
+            report_dir = Path(output_config['_resolved_report_path']).parent
+            if output_config.get('create_parent_dirs', True) and report_dir:
+                try:
+                    report_dir.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    self.log(f"ERROR: Could not create report directory: {e}", "ERROR")
+                    return False
         
         self.log("Configuration validation successful")
         return True
@@ -616,6 +652,53 @@ class RingTextGenerator:
             self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
             return None
     
+    def write_json_report(self, volume_mm3, volume_cm3, weight_g):
+        """Write JSON report with volume and weight data"""
+        if '_resolved_report_path' not in self.config['output']:
+            return  # No report file specified
+        
+        report_path = self.config['output']['_resolved_report_path']
+        
+        try:
+            # Prepare report data
+            report = {
+                "timestamp": datetime.now().isoformat(),
+                "config_file": str(self.config_path),
+                "ring_parameters": {
+                    "inner_diameter": self.config['ring']['inner_diameter'],
+                    "outer_diameter": self.config['ring']['outer_diameter'],
+                    "length": self.config['ring']['length'],
+                    "radial_segments": self.config['ring']['radial_segments'],
+                    "vertical_segments": self.config['ring']['vertical_segments']
+                },
+                "text_parameters": {
+                    "content": self.config['text']['content'],
+                    "font_size": self.config['text']['font_size'],
+                    "depth": self.config['text']['depth'],
+                    "direction": self.config['text']['direction']
+                },
+                "material": {
+                    "name": self.config['material']['name'],
+                    "density": self.config['material']['density']
+                },
+                "results": {
+                    "volume_mm3": round(volume_mm3, 2),
+                    "volume_cm3": round(volume_cm3, 3),
+                    "weight_g": round(weight_g, 2),
+                    "stl_file": self.config['output']['_resolved_output_path']
+                }
+            }
+            
+            # Write JSON report
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            
+            self.log(f"Written JSON report to: {report_path}")
+            
+        except Exception as e:
+            self.log(f"ERROR: Failed to write JSON report: {e}", "ERROR")
+            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+    
     def export_stl(self, obj):
         """Export the final mesh as STL"""
         output_path = self.config['output']['_resolved_output_path']
@@ -625,20 +708,22 @@ class RingTextGenerator:
         volume_mm3, volume_cm3 = self.calculate_mesh_volume(obj)
         
         if volume_mm3 is not None:
+            # Get material properties
+            material_name = self.config['material']['name']
+            material_density = self.config['material']['density']  # g/cm³
+            
+            # Calculate weight
+            weight_g = volume_cm3 * material_density
+            
             self.log(f"Mesh volume: {volume_mm3:.2f} mm³ ({volume_cm3:.3f} cm³)")
+            self.log(f"Material: {material_name} (density: {material_density} g/cm³)")
+            self.log(f"Estimated weight: {weight_g:.2f} g")
             
-            # Also log some useful derived information
-            # Assuming common 3D printing materials
-            pla_density = 1.24  # g/cm³
-            abs_density = 1.05  # g/cm³
-            petg_density = 1.27  # g/cm³
-            
-            self.log("Estimated material weight:")
-            self.log(f"  - PLA: {volume_cm3 * pla_density:.2f} g")
-            self.log(f"  - ABS: {volume_cm3 * abs_density:.2f} g")
-            self.log(f"  - PETG: {volume_cm3 * petg_density:.2f} g")
+            # Write JSON report if configured
+            self.write_json_report(volume_mm3, volume_cm3, weight_g)
         else:
             self.log("WARNING: Could not calculate mesh volume", "WARNING")
+            weight_g = None
         
         self.log(f"Exporting STL to: {output_path}")
         
@@ -687,6 +772,9 @@ class RingTextGenerator:
                 self.log(f"  File size: {file_size:,} bytes")
                 if volume_mm3 is not None:
                     self.log(f"  Volume: {volume_mm3:.2f} mm³ ({volume_cm3:.3f} cm³)")
+                    self.log(f"  Weight: {weight_g:.2f} g ({material_name})")
+                if '_resolved_report_path' in self.config['output']:
+                    self.log(f"  Report file: {self.config['output']['_resolved_report_path']}")
                 self.log("-" * 60)
                 
                 return True

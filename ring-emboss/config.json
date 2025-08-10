@@ -13,8 +13,13 @@
     "depth": 0.25,
     "direction": "normal"
   },
+  "material": {
+    "name": "PLA",
+    "density": 1.24
+  },
   "output": {
     "stl_filename": "output/custom_ring.stl",
+    "report_filename": "output/ring_report.json",
     "log_filename": "output/ring_generation.log",
     "create_parent_dirs": true
   }
