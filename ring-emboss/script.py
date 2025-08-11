@@ -34,7 +34,7 @@ class RingTextGenerator:
         if self.log_file:
             try:
                 with open(self.log_file, 'a') as f:
-                    f.write(formatted_msg + '')
+                    f.write(formatted_msg + '\n')
             except Exception as e:
                 print(f"Warning: Could not write to log file: {e}")
     
@@ -58,9 +58,9 @@ class RingTextGenerator:
             # Create log file and write header
             try:
                 with open(self.log_file, 'w') as f:
-                    f.write(f"Ring Text Generator Log - Started at {datetime.now()}")
-                    f.write(f"Config file: {self.config_path}")
-                    f.write("-" * 60 + "")
+                    f.write(f"Ring Text Generator Log - Started at {datetime.now()}\n")
+                    f.write(f"Config file: {self.config_path}\n")
+                    f.write("-" * 60 + "\n")
             except Exception as e:
                 print(f"Warning: Could not create log file: {e}")
                 self.log_file = None
@@ -166,7 +166,7 @@ class RingTextGenerator:
             return False
         
         # Remove newlines as specified
-        text_config['content'] = text.replace('', '').replace('\r', '')
+        text_config['content'] = text.replace('\n', '').replace('\r', '')
         
         # Check text length
         if len(text_config['content']) > 500:
