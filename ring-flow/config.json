@@ -1,0 +1,26 @@
+{
+  "ring": {
+    "inner_diameter": 18.0,
+    "outer_diameter": 20.0,
+    "length": 3.0,
+    "radial_segments": 256,
+    "vertical_segments": 64
+  },
+  "text": {
+    "content": "forever yours my love, you're my love",
+    "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
+    "font_size": 3.0,
+    "depth": 0.25,
+    "direction": "normal"
+  },
+  "material": {
+    "name": "GOLD g/cm³",
+    "density": 19.3
+  },
+  "output": {
+    "stl_filename": "output/custom_ring.stl",
+    "report_filename": "output/ring_report.json",
+    "log_filename": "output/ring_generation.log",
+    "create_parent_dirs": true
+  }
+}
