@@ -790,10 +790,55 @@ class RingTextGenerator:
         
         wedges = []
         
-        # Create wedge at both text start and end
-        wedge_angle = math.radians(2)  # Match the padding angle
+        # First, we need to analyze the text mesh to find actual boundary vertices
+        # Get the text object (assuming it exists in the scene)
+        text_obj = None
+        for obj in bpy.data.objects:
+            if obj.name == "Text" and obj.type == 'MESH':
+                text_obj = obj
+                break
         
-        for side, text_angle in [("start", self.text_start_angle), ("end", self.text_end_angle)]:
+        if not text_obj:
+            self.log("WARNING: Could not find text object for wedge creation", "WARNING")
+            return wedges
+        
+        text_mesh = text_obj.data
+        
+        # Find the actual leftmost and rightmost vertices of the text
+        leftmost_angle = float('inf')
+        rightmost_angle = float('-inf')
+        leftmost_vertices = []
+        rightmost_vertices = []
+        
+        # Analyze all vertices to find boundaries
+        for vertex in text_mesh.vertices:
+            # Calculate angle for this vertex
+            x, y, z = vertex.co
+            if x != 0 or y != 0:  # Avoid division by zero
+                angle = math.atan2(x, y)
+                
+                # Track extreme angles
+                if angle < leftmost_angle:
+                    leftmost_angle = angle
+                    leftmost_vertices = [vertex]
+                elif abs(angle - leftmost_angle) < 0.001:  # Within tolerance
+                    leftmost_vertices.append(vertex)
+                    
+                if angle > rightmost_angle:
+                    rightmost_angle = angle
+                    rightmost_vertices = [vertex]
+                elif abs(angle - rightmost_angle) < 0.001:  # Within tolerance
+                    rightmost_vertices.append(vertex)
+        
+        self.log(f"Found text boundaries: left={math.degrees(leftmost_angle):.2f}°, right={math.degrees(rightmost_angle):.2f}°")
+        
+        # Create wedge at both text start and end
+        wedge_angle = math.radians(2)  # Size of the wedge
+        
+        for side, text_angle, boundary_vertices in [
+            ("start", leftmost_angle, leftmost_vertices), 
+            ("end", rightmost_angle, rightmost_vertices)
+        ]:
             mesh = bpy.data.meshes.new(name=f"Wedge_{side}")
             wedge_obj = bpy.data.objects.new(f"Wedge_{side}", mesh)
             bpy.context.collection.objects.link(wedge_obj)
@@ -805,206 +850,196 @@ class RingTextGenerator:
             if side == "start":
                 # Start wedge connects ring to text start
                 angle1 = text_angle - wedge_angle  # Ring side
-                angle2 = text_angle  # Text side
+                angle2 = text_angle  # Text side (actual text boundary)
             else:
                 # End wedge connects text end to ring
-                angle1 = text_angle  # Text side
+                angle1 = text_angle  # Text side (actual text boundary)
                 angle2 = text_angle + wedge_angle  # Ring side
+            
+            # Analyze boundary vertices to find the exact radial positions
+            boundary_radii = []
+            boundary_z_positions = []
+            for v in boundary_vertices:
+                r = math.sqrt(v.co.x**2 + v.co.y**2)
+                boundary_radii.append(r)
+                boundary_z_positions.append(v.co.z)
+            
+            # Get min and max radii and z positions from actual text
+            if boundary_radii:
+                text_inner_r = min(boundary_radii)
+                text_outer_r = max(boundary_radii)
+                text_min_z = min(boundary_z_positions)
+                text_max_z = max(boundary_z_positions)
+            else:
+                # Fallback to theoretical values
+                text_inner_r = outer_radius
+                text_outer_r = outer_radius + text_depth
+                text_min_z = -length/2
+                text_max_z = length/2
+            
+            self.log(f"Wedge {side}: text radii {text_inner_r:.2f}-{text_outer_r:.2f}mm, z range {text_min_z:.2f}-{text_max_z:.2f}mm")
             
             # Create vertices for the wedge
             vertices_grid = {}
             
-            # Create vertices
-            for z_idx, z in enumerate([0, 1]):  # 0 = bottom, 1 = top
-                z_coord = -length/2 + z * length
+            # Create vertices at multiple z-levels to match text height
+            z_levels = 5  # More levels for better connection
+            for z_idx in range(z_levels):
+                z_coord = text_min_z + (text_max_z - text_min_z) * z_idx / (z_levels - 1)
                 
                 for angle_idx, angle in enumerate([angle1, angle2]):
-                    for r_idx, r in enumerate([0, 1, 2]):  # 0 = inner, 1 = outer, 2 = outer+text_depth
-                        if r_idx == 0:
-                            radius = inner_radius
-                        elif r_idx == 1:
-                            radius = outer_radius
-                        else:
-                            # Only create text depth vertices on text side
-                            if (side == "start" and angle_idx == 1) or (side == "end" and angle_idx == 0):
-                                radius = outer_radius + text_depth
-                            else:
-                                continue  # Skip this vertex
-                        
-                        x = radius * math.sin(angle)
-                        y = radius * math.cos(angle)
-                        
-                        vert = bm.verts.new((x, y, z_coord))
-                        vertices_grid[(z_idx, angle_idx, r_idx)] = vert
+                    # Ring side vertices (angle1 for start, angle2 for end)
+                    if (side == "start" and angle_idx == 0) or (side == "end" and angle_idx == 1):
+                        # Ring side: create vertices at ring radii
+                        for r_idx, radius in enumerate([inner_radius, outer_radius]):
+                            x = radius * math.sin(angle)
+                            y = radius * math.cos(angle)
+                            vert = bm.verts.new((x, y, z_coord))
+                            vertices_grid[(z_idx, angle_idx, r_idx)] = vert
+                    else:
+                        # Text side: create vertices matching text boundary
+                        # Use actual text radii
+                        radii = [text_inner_r, text_outer_r]
+                        for r_idx, radius in enumerate(radii):
+                            x = radius * math.sin(angle)
+                            y = radius * math.cos(angle)
+                            vert = bm.verts.new((x, y, z_coord))
+                            vertices_grid[(z_idx, angle_idx, r_idx + 10)] = vert  # Offset index for text side
             
             bm.verts.ensure_lookup_table()
             
-            # Create faces
-            # Bottom face
-            if (0, 0, 0) in vertices_grid and (0, 1, 0) in vertices_grid:
-                if (0, 1, 1) in vertices_grid and (0, 0, 1) in vertices_grid:
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(0, 0, 1)],
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(0, 1, 0)]
-                    ])
-            
-            # Top face
-            if (1, 0, 0) in vertices_grid and (1, 1, 0) in vertices_grid:
-                if (1, 1, 1) in vertices_grid and (1, 0, 1) in vertices_grid:
-                    bm.faces.new([
-                        vertices_grid[(1, 0, 0)],
-                        vertices_grid[(1, 1, 0)],
-                        vertices_grid[(1, 1, 1)],
-                        vertices_grid[(1, 0, 1)]
-                    ])
-            
-            # Inner surface
-            if (0, 0, 0) in vertices_grid and (1, 0, 0) in vertices_grid:
-                if (1, 1, 0) in vertices_grid and (0, 1, 0) in vertices_grid:
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(1, 1, 0)],
-                        vertices_grid[(1, 0, 0)]
-                    ])
-            
-            # Outer surface (ring side)
-            if (side == "start" and (0, 0, 1) in vertices_grid and (1, 0, 1) in vertices_grid) or \
-            (side == "end" and (0, 1, 1) in vertices_grid and (1, 1, 1) in vertices_grid):
+            # Create faces to connect the vertices
+            for z_idx in range(z_levels - 1):
+                # Connect ring side to text side
                 if side == "start":
-                    if (1, 1, 1) in vertices_grid and (0, 1, 1) in vertices_grid:
+                    # For start wedge: angle1 is ring side, angle2 is text side
+                    # Inner surface
+                    if all((z_idx + dz, 0, 0) in vertices_grid and (z_idx + dz, 1, 10) in vertices_grid 
+                        for dz in [0, 1]):
                         bm.faces.new([
-                            vertices_grid[(0, 0, 1)],
-                            vertices_grid[(1, 0, 1)],
-                            vertices_grid[(1, 1, 1)],
-                            vertices_grid[(0, 1, 1)]
+                            vertices_grid[(z_idx, 0, 0)],
+                            vertices_grid[(z_idx, 1, 10)],
+                            vertices_grid[(z_idx + 1, 1, 10)],
+                            vertices_grid[(z_idx + 1, 0, 0)]
                         ])
-                else:
-                    if (1, 0, 1) in vertices_grid and (0, 0, 1) in vertices_grid:
+                    
+                    # Outer surface
+                    if all((z_idx + dz, 0, 1) in vertices_grid and (z_idx + dz, 1, 11) in vertices_grid 
+                        for dz in [0, 1]):
                         bm.faces.new([
-                            vertices_grid[(0, 1, 1)],
-                            vertices_grid[(0, 0, 1)],
-                            vertices_grid[(1, 0, 1)],
-                            vertices_grid[(1, 1, 1)]
+                            vertices_grid[(z_idx, 0, 1)],
+                            vertices_grid[(z_idx + 1, 0, 1)],
+                            vertices_grid[(z_idx + 1, 1, 11)],
+                            vertices_grid[(z_idx, 1, 11)]
+                        ])
+                    
+                    # Ring side face
+                    if all((z_idx + dz, 0, r) in vertices_grid for dz in [0, 1] for r in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 0, 0)],
+                            vertices_grid[(z_idx + 1, 0, 0)],
+                            vertices_grid[(z_idx + 1, 0, 1)],
+                            vertices_grid[(z_idx, 0, 1)]
+                        ])
+                    
+                    # Text side face
+                    if all((z_idx + dz, 1, r + 10) in vertices_grid for dz in [0, 1] for r in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 1, 10)],
+                            vertices_grid[(z_idx, 1, 11)],
+                            vertices_grid[(z_idx + 1, 1, 11)],
+                            vertices_grid[(z_idx + 1, 1, 10)]
+                        ])
+                
+                else:  # end wedge
+                    # For end wedge: angle1 is text side, angle2 is ring side
+                    # Inner surface
+                    if all((z_idx + dz, 0, 10) in vertices_grid and (z_idx + dz, 1, 0) in vertices_grid 
+                        for dz in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 0, 10)],
+                            vertices_grid[(z_idx + 1, 0, 10)],
+                            vertices_grid[(z_idx + 1, 1, 0)],
+                            vertices_grid[(z_idx, 1, 0)]
+                        ])
+                    
+                    # Outer surface
+                    if all((z_idx + dz, 0, 11) in vertices_grid and (z_idx + dz, 1, 1) in vertices_grid 
+                        for dz in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 0, 11)],
+                            vertices_grid[(z_idx, 1, 1)],
+                            vertices_grid[(z_idx + 1, 1, 1)],
+                            vertices_grid[(z_idx + 1, 0, 11)]
+                        ])
+                    
+                    # Text side face
+                    if all((z_idx + dz, 0, r + 10) in vertices_grid for dz in [0, 1] for r in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 0, 10)],
+                            vertices_grid[(z_idx, 0, 11)],
+                            vertices_grid[(z_idx + 1, 0, 11)],
+                            vertices_grid[(z_idx + 1, 0, 10)]
+                        ])
+                    
+                    # Ring side face
+                    if all((z_idx + dz, 1, r) in vertices_grid for dz in [0, 1] for r in [0, 1]):
+                        bm.faces.new([
+                            vertices_grid[(z_idx, 1, 0)],
+                            vertices_grid[(z_idx + 1, 1, 0)],
+                            vertices_grid[(z_idx + 1, 1, 1)],
+                            vertices_grid[(z_idx, 1, 1)]
                         ])
             
-            # Text side surface with depth
-            if side == "start" and (0, 1, 1) in vertices_grid and (0, 1, 2) in vertices_grid:
-                if (1, 1, 2) in vertices_grid and (1, 1, 1) in vertices_grid:
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(1, 1, 1)],
-                        vertices_grid[(1, 1, 2)],
-                        vertices_grid[(0, 1, 2)]
-                    ])
-            elif side == "end" and (0, 0, 1) in vertices_grid and (0, 0, 2) in vertices_grid:
-                if (1, 0, 2) in vertices_grid and (1, 0, 1) in vertices_grid:
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 1)],
-                        vertices_grid[(0, 0, 2)],
-                        vertices_grid[(1, 0, 2)],
-                        vertices_grid[(1, 0, 1)]
-                    ])
-            
-            # End caps (triangular faces)
-            # Ring side end cap
+            # Top and bottom caps
+            # Bottom cap
+            z_idx = 0
             if side == "start":
-                if all((z, 0, r) in vertices_grid for z in [0, 1] for r in [0, 1]):
-                    # Bottom triangle
+                if all((z_idx, a, 0) in vertices_grid for a in [0, 1]) and \
+                all((z_idx, a, 1) in vertices_grid for a in [0]) and \
+                all((z_idx, a, 10) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 11) in vertices_grid for a in [1]):
                     bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(1, 0, 0)],
-                        vertices_grid[(1, 0, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(1, 0, 1)],
-                        vertices_grid[(0, 0, 1)]
+                        vertices_grid[(z_idx, 0, 0)],
+                        vertices_grid[(z_idx, 0, 1)],
+                        vertices_grid[(z_idx, 1, 11)],
+                        vertices_grid[(z_idx, 1, 10)]
                     ])
             else:
-                if all((z, 1, r) in vertices_grid for z in [0, 1] for r in [0, 1]):
-                    # Bottom triangle
+                if all((z_idx, a, 0) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 1) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 10) in vertices_grid for a in [0]) and \
+                all((z_idx, a, 11) in vertices_grid for a in [0]):
                     bm.faces.new([
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(1, 1, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(1, 1, 1)],
-                        vertices_grid[(1, 1, 0)]
+                        vertices_grid[(z_idx, 0, 10)],
+                        vertices_grid[(z_idx, 0, 11)],
+                        vertices_grid[(z_idx, 1, 1)],
+                        vertices_grid[(z_idx, 1, 0)]
                     ])
             
-            # Text side end cap (with depth)
+            # Top cap
+            z_idx = z_levels - 1
             if side == "start":
-                if all((z, 1, r) in vertices_grid for z in [0, 1] for r in [0, 1, 2]):
-                    # Create triangular faces for the text side
+                if all((z_idx, a, 0) in vertices_grid for a in [0, 1]) and \
+                all((z_idx, a, 1) in vertices_grid for a in [0]) and \
+                all((z_idx, a, 10) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 11) in vertices_grid for a in [1]):
                     bm.faces.new([
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(1, 1, 0)],
-                        vertices_grid[(1, 1, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(1, 1, 1)],
-                        vertices_grid[(0, 1, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(1, 1, 1)],
-                        vertices_grid[(1, 1, 2)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(1, 1, 2)],
-                        vertices_grid[(0, 1, 2)]
-                    ])
-                    # Top and bottom faces for depth
-                    bm.faces.new([
-                        vertices_grid[(0, 1, 0)],
-                        vertices_grid[(0, 1, 1)],
-                        vertices_grid[(0, 1, 2)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(1, 1, 0)],
-                        vertices_grid[(1, 1, 2)],
-                        vertices_grid[(1, 1, 1)]
+                        vertices_grid[(z_idx, 0, 0)],
+                        vertices_grid[(z_idx, 1, 10)],
+                        vertices_grid[(z_idx, 1, 11)],
+                        vertices_grid[(z_idx, 0, 1)]
                     ])
             else:
-                if all((z, 0, r) in vertices_grid for z in [0, 1] for r in [0, 1, 2]):
-                    # Create triangular faces for the text side
+                if all((z_idx, a, 0) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 1) in vertices_grid for a in [1]) and \
+                all((z_idx, a, 10) in vertices_grid for a in [0]) and \
+                all((z_idx, a, 11) in vertices_grid for a in [0]):
                     bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(0, 0, 1)],
-                        vertices_grid[(1, 0, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(1, 0, 1)],
-                        vertices_grid[(1, 0, 0)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 1)],
-                        vertices_grid[(0, 0, 2)],
-                        vertices_grid[(1, 0, 2)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 1)],
-                        vertices_grid[(1, 0, 2)],
-                        vertices_grid[(1, 0, 1)]
-                    ])
-                    # Top and bottom faces for depth
-                    bm.faces.new([
-                        vertices_grid[(0, 0, 0)],
-                        vertices_grid[(0, 0, 2)],
-                        vertices_grid[(0, 0, 1)]
-                    ])
-                    bm.faces.new([
-                        vertices_grid[(1, 0, 0)],
-                        vertices_grid[(1, 0, 1)],
-                        vertices_grid[(1, 0, 2)]
+                        vertices_grid[(z_idx, 0, 10)],
+                        vertices_grid[(z_idx, 1, 0)],
+                        vertices_grid[(z_idx, 1, 1)],
+                        vertices_grid[(z_idx, 0, 11)]
                     ])
             
             # Update mesh
