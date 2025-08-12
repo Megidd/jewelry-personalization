@@ -689,6 +689,339 @@ class RingTextGenerator:
             self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
             return None
     
+    def combine_ring_and_text_with_wedges(self, ring_obj, text_obj, wedge_objs):
+        """Combine ring, text, and wedges by merging meshes directly"""
+        self.log("Merging ring, text, and wedge meshes...")
+
+        try:
+            # Get the mesh data
+            ring_mesh = ring_obj.data
+            text_mesh = text_obj.data
+            
+            # Create a new mesh for the combined result
+            combined_mesh = bpy.data.meshes.new(name="CombinedRing")
+
+            # Get vertex data from all meshes
+            all_verts = []
+            all_faces = []
+            vertex_offset = 0
+            
+            # Add ring vertices and faces
+            ring_verts = [(v.co.x, v.co.y, v.co.z) for v in ring_mesh.vertices]
+            all_verts.extend(ring_verts)
+            
+            for poly in ring_mesh.polygons:
+                face = [v for v in poly.vertices]
+                all_faces.append(face)
+            
+            vertex_offset = len(ring_verts)
+            
+            # Add text vertices and faces
+            text_verts = [(v.co.x, v.co.y, v.co.z) for v in text_mesh.vertices]
+            all_verts.extend(text_verts)
+            
+            for poly in text_mesh.polygons:
+                face = [v + vertex_offset for v in poly.vertices]
+                all_faces.append(face)
+            
+            vertex_offset += len(text_verts)
+            
+            # Add wedge vertices and faces
+            for wedge_obj in wedge_objs:
+                wedge_mesh = wedge_obj.data
+                wedge_verts = [(v.co.x, v.co.y, v.co.z) for v in wedge_mesh.vertices]
+                all_verts.extend(wedge_verts)
+                
+                for poly in wedge_mesh.polygons:
+                    face = [v + vertex_offset for v in poly.vertices]
+                    all_faces.append(face)
+                
+                vertex_offset += len(wedge_verts)
+
+            # Create the combined mesh
+            combined_mesh.from_pydata(all_verts, [], all_faces)
+            combined_mesh.update()
+
+            # Create new object with combined mesh
+            combined_obj = bpy.data.objects.new("FinalRing", combined_mesh)
+            bpy.context.collection.objects.link(combined_obj)
+
+            # Copy materials if any
+            if len(ring_obj.data.materials) > 0:
+                for mat in ring_obj.data.materials:
+                    combined_obj.data.materials.append(mat)
+
+            # Select and make active
+            bpy.ops.object.select_all(action='DESELECT')
+            combined_obj.select_set(True)
+            bpy.context.view_layer.objects.active = combined_obj
+
+            # Clean up duplicate vertices at boundaries
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.remove_doubles(threshold=0.0001)
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+            # Apply smooth shading
+            bpy.ops.object.shade_smooth()
+
+            # Delete the original objects
+            bpy.data.objects.remove(ring_obj, do_unlink=True)
+            bpy.data.objects.remove(text_obj, do_unlink=True)
+            for wedge_obj in wedge_objs:
+                bpy.data.objects.remove(wedge_obj, do_unlink=True)
+
+            self.log(f"Successfully merged meshes: {len(all_verts)} vertices, {len(all_faces)} faces")
+            return combined_obj
+
+        except Exception as e:
+            self.log(f"ERROR: Failed to merge meshes: {e}", "ERROR")
+            self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+            return None
+
+    def create_transition_wedges(self):
+        """Create small wedge meshes to bridge gaps between text and ring"""
+        ring_config = self.config['ring']
+        inner_radius = ring_config['inner_diameter'] / 2
+        outer_radius = ring_config['outer_diameter'] / 2
+        length = ring_config['length']
+        text_depth = self.config['text']['depth']
+        
+        wedges = []
+        
+        # Create wedge at both text start and end
+        wedge_angle = math.radians(2)  # Match the padding angle
+        
+        for side, text_angle in [("start", self.text_start_angle), ("end", self.text_end_angle)]:
+            mesh = bpy.data.meshes.new(name=f"Wedge_{side}")
+            wedge_obj = bpy.data.objects.new(f"Wedge_{side}", mesh)
+            bpy.context.collection.objects.link(wedge_obj)
+            
+            # Create bmesh for easier geometry creation
+            bm = bmesh.new()
+            
+            # Define the wedge boundaries
+            if side == "start":
+                # Start wedge connects ring to text start
+                angle1 = text_angle - wedge_angle  # Ring side
+                angle2 = text_angle  # Text side
+            else:
+                # End wedge connects text end to ring
+                angle1 = text_angle  # Text side
+                angle2 = text_angle + wedge_angle  # Ring side
+            
+            # Create vertices for the wedge
+            vertices_grid = {}
+            
+            # Create vertices
+            for z_idx, z in enumerate([0, 1]):  # 0 = bottom, 1 = top
+                z_coord = -length/2 + z * length
+                
+                for angle_idx, angle in enumerate([angle1, angle2]):
+                    for r_idx, r in enumerate([0, 1, 2]):  # 0 = inner, 1 = outer, 2 = outer+text_depth
+                        if r_idx == 0:
+                            radius = inner_radius
+                        elif r_idx == 1:
+                            radius = outer_radius
+                        else:
+                            # Only create text depth vertices on text side
+                            if (side == "start" and angle_idx == 1) or (side == "end" and angle_idx == 0):
+                                radius = outer_radius + text_depth
+                            else:
+                                continue  # Skip this vertex
+                        
+                        x = radius * math.sin(angle)
+                        y = radius * math.cos(angle)
+                        
+                        vert = bm.verts.new((x, y, z_coord))
+                        vertices_grid[(z_idx, angle_idx, r_idx)] = vert
+            
+            bm.verts.ensure_lookup_table()
+            
+            # Create faces
+            # Bottom face
+            if (0, 0, 0) in vertices_grid and (0, 1, 0) in vertices_grid:
+                if (0, 1, 1) in vertices_grid and (0, 0, 1) in vertices_grid:
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(0, 0, 1)],
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(0, 1, 0)]
+                    ])
+            
+            # Top face
+            if (1, 0, 0) in vertices_grid and (1, 1, 0) in vertices_grid:
+                if (1, 1, 1) in vertices_grid and (1, 0, 1) in vertices_grid:
+                    bm.faces.new([
+                        vertices_grid[(1, 0, 0)],
+                        vertices_grid[(1, 1, 0)],
+                        vertices_grid[(1, 1, 1)],
+                        vertices_grid[(1, 0, 1)]
+                    ])
+            
+            # Inner surface
+            if (0, 0, 0) in vertices_grid and (1, 0, 0) in vertices_grid:
+                if (1, 1, 0) in vertices_grid and (0, 1, 0) in vertices_grid:
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(1, 1, 0)],
+                        vertices_grid[(1, 0, 0)]
+                    ])
+            
+            # Outer surface (ring side)
+            if (side == "start" and (0, 0, 1) in vertices_grid and (1, 0, 1) in vertices_grid) or \
+            (side == "end" and (0, 1, 1) in vertices_grid and (1, 1, 1) in vertices_grid):
+                if side == "start":
+                    if (1, 1, 1) in vertices_grid and (0, 1, 1) in vertices_grid:
+                        bm.faces.new([
+                            vertices_grid[(0, 0, 1)],
+                            vertices_grid[(1, 0, 1)],
+                            vertices_grid[(1, 1, 1)],
+                            vertices_grid[(0, 1, 1)]
+                        ])
+                else:
+                    if (1, 0, 1) in vertices_grid and (0, 0, 1) in vertices_grid:
+                        bm.faces.new([
+                            vertices_grid[(0, 1, 1)],
+                            vertices_grid[(0, 0, 1)],
+                            vertices_grid[(1, 0, 1)],
+                            vertices_grid[(1, 1, 1)]
+                        ])
+            
+            # Text side surface with depth
+            if side == "start" and (0, 1, 1) in vertices_grid and (0, 1, 2) in vertices_grid:
+                if (1, 1, 2) in vertices_grid and (1, 1, 1) in vertices_grid:
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(1, 1, 1)],
+                        vertices_grid[(1, 1, 2)],
+                        vertices_grid[(0, 1, 2)]
+                    ])
+            elif side == "end" and (0, 0, 1) in vertices_grid and (0, 0, 2) in vertices_grid:
+                if (1, 0, 2) in vertices_grid and (1, 0, 1) in vertices_grid:
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 1)],
+                        vertices_grid[(0, 0, 2)],
+                        vertices_grid[(1, 0, 2)],
+                        vertices_grid[(1, 0, 1)]
+                    ])
+            
+            # End caps (triangular faces)
+            # Ring side end cap
+            if side == "start":
+                if all((z, 0, r) in vertices_grid for z in [0, 1] for r in [0, 1]):
+                    # Bottom triangle
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(1, 0, 0)],
+                        vertices_grid[(1, 0, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(1, 0, 1)],
+                        vertices_grid[(0, 0, 1)]
+                    ])
+            else:
+                if all((z, 1, r) in vertices_grid for z in [0, 1] for r in [0, 1]):
+                    # Bottom triangle
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(1, 1, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(1, 1, 1)],
+                        vertices_grid[(1, 1, 0)]
+                    ])
+            
+            # Text side end cap (with depth)
+            if side == "start":
+                if all((z, 1, r) in vertices_grid for z in [0, 1] for r in [0, 1, 2]):
+                    # Create triangular faces for the text side
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(1, 1, 0)],
+                        vertices_grid[(1, 1, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(1, 1, 1)],
+                        vertices_grid[(0, 1, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(1, 1, 1)],
+                        vertices_grid[(1, 1, 2)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(1, 1, 2)],
+                        vertices_grid[(0, 1, 2)]
+                    ])
+                    # Top and bottom faces for depth
+                    bm.faces.new([
+                        vertices_grid[(0, 1, 0)],
+                        vertices_grid[(0, 1, 1)],
+                        vertices_grid[(0, 1, 2)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(1, 1, 0)],
+                        vertices_grid[(1, 1, 2)],
+                        vertices_grid[(1, 1, 1)]
+                    ])
+            else:
+                if all((z, 0, r) in vertices_grid for z in [0, 1] for r in [0, 1, 2]):
+                    # Create triangular faces for the text side
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(0, 0, 1)],
+                        vertices_grid[(1, 0, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(1, 0, 1)],
+                        vertices_grid[(1, 0, 0)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 1)],
+                        vertices_grid[(0, 0, 2)],
+                        vertices_grid[(1, 0, 2)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 1)],
+                        vertices_grid[(1, 0, 2)],
+                        vertices_grid[(1, 0, 1)]
+                    ])
+                    # Top and bottom faces for depth
+                    bm.faces.new([
+                        vertices_grid[(0, 0, 0)],
+                        vertices_grid[(0, 0, 2)],
+                        vertices_grid[(0, 0, 1)]
+                    ])
+                    bm.faces.new([
+                        vertices_grid[(1, 0, 0)],
+                        vertices_grid[(1, 0, 1)],
+                        vertices_grid[(1, 0, 2)]
+                    ])
+            
+            # Update mesh
+            bm.to_mesh(mesh)
+            bm.free()
+            
+            # Apply smooth shading
+            wedge_obj.select_set(True)
+            bpy.context.view_layer.objects.active = wedge_obj
+            bpy.ops.object.shade_smooth()
+            
+            wedges.append(wedge_obj)
+            
+            self.log(f"Created transition wedge at {side} (angle: {math.degrees(text_angle):.2f}°)")
+        
+        return wedges
+
     def write_json_report(self, volume_mm3, volume_cm3, weight_g):
         """Write JSON report with volume and weight data"""
         if '_resolved_report_path' not in self.config['output']:
@@ -851,53 +1184,66 @@ class RingTextGenerator:
             self.log("Starting ring generation...")
             if not self.load_config():
                 return 2  # File I/O error
-            
+
             # Validate configuration
             if not self.validate_config():
                 return 1  # Input validation error
-            
+
             # Clear scene
             self.clear_scene()
-            
+
             # Create text and calculate its arc
             self.log("Creating text geometry and calculating arc...")
             text_obj = self.create_text_and_calculate_arc()
             if not text_obj:
                 self.log("ERROR: Failed to create text", "ERROR")
                 return 4  # Font rendering error
-            
+
             # Create partial ring based on text arc
             self.log("Creating partial ring geometry...")
             ring_obj = self.create_partial_ring(self.text_start_angle, self.text_end_angle)
             if not ring_obj:
                 self.log("ERROR: Failed to create ring", "ERROR")
                 return 3  # Blender operation error
+
+            # Create transition wedges
+            self.log("Creating transition wedges...")
+            wedge_objs = self.create_transition_wedges()
+            if not wedge_objs:
+                self.log("WARNING: Failed to create transition wedges", "WARNING")
+                # Continue without wedges
+                wedge_objs = []
+
+            # Combine everything
+            self.log("Combining all geometry...")
+            if wedge_objs:
+                # Use the new method that includes wedges
+                final_obj = self.combine_ring_and_text_with_wedges(ring_obj, text_obj, wedge_objs)
+            else:
+                # Fall back to original method
+                final_obj = self.combine_ring_and_text(ring_obj, text_obj)
             
-            # Combine ring and text
-            self.log("Combining ring and text...")
-            final_obj = self.combine_ring_and_text(ring_obj, text_obj)
             if not final_obj:
-                self.log("ERROR: Failed to combine ring and text", "ERROR")
+                self.log("ERROR: Failed to combine geometry", "ERROR")
                 self.cleanup_on_error()
                 return 3  # Blender operation error
-            
-            # Export STL
+
+            # Export as STL
             if not self.export_stl(final_obj):
                 self.cleanup_on_error()
                 return 2  # File I/O error
-            
-            self.log("Ring generation completed successfully")
+
+            self.log("Ring generation completed successfully!")
             return 0  # Success
-            
+
         except Exception as e:
             self.log(f"ERROR: Unexpected error: {e}", "ERROR")
             self.log(f"Traceback: {traceback.format_exc()}", "ERROR")
             self.cleanup_on_error()
             return 3  # Blender operation error
-        finally:
-            # Always ensure Blender is properly closed
-            self.log("Cleaning up Blender resources...")
 
+        finally:
+            self.log("Cleaning up Blender resources...")
 
 def main():
     """Main entry point"""
