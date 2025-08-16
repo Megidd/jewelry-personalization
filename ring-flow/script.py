@@ -289,78 +289,71 @@ class RingTextGenerator:
         self.log("Scene cleared")
     
     def create_text_and_calculate_arc(self):
-        """Create 3D text and calculate the arc it occupies"""
-        text_config = self.config['text']
-        ring_config = self.config['ring']
-        
-        text = text_config['content']
-        font_path = text_config['_resolved_font_path']
-        font_size = text_config['font_size']
-        text_depth = text_config['depth']
-        outer_radius = ring_config['outer_diameter'] / 2
-        text_direction = text_config.get('direction', 'normal')
-        
-        self.log("Creating text object...")
-        
-        # Load font
+        """Create embossed text and calculate the arc it will occupy"""
+        text = self.config['text']['content']
+        font_path = self.config['text']['font_path']
+        font_size = self.config['text']['font_size']
+        text_depth = self.config['text']['depth']
+        outer_radius = self.config['ring']['outer_diameter'] / 2
+        text_direction = self.config['text']['direction']
+
+        self.log(f"Creating text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
+
+        # Load the font
         try:
             font = bpy.data.fonts.load(font_path)
-            self.log(f"Loaded font: {font_path}")
         except Exception as e:
-            self.log(f"ERROR: Failed to load font: {e}", "ERROR")
+            self.log(f"ERROR: Failed to load font from {font_path}: {e}", "ERROR")
             return None
-        
-        # Create text curve object
-        curve = bpy.data.curves.new(type="FONT", name="Text")
-        curve.body = text
-        curve.font = font
-        
-        # Set text properties
-        curve.size = font_size
-        curve.extrude = text_depth
-        curve.bevel_depth = 0
-        curve.align_x = 'CENTER'
-        curve.align_y = 'CENTER'
-        
+
+        # Create text curve
+        text_curve = bpy.data.curves.new(name="TextCurve", type='FONT')
+        text_curve.body = text
+        text_curve.font = font
+        text_curve.size = font_size
+        text_curve.extrude = text_depth
+        text_curve.bevel_depth = 0
+        text_curve.align_x = 'CENTER'
+        text_curve.align_y = 'CENTER'
+
         # Create text object
-        text_obj = bpy.data.objects.new("Text", curve)
+        text_obj = bpy.data.objects.new("Text", text_curve)
         bpy.context.collection.objects.link(text_obj)
-        
+
         # Convert to mesh
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
-        
-        self.log("Converting text to mesh...")
         bpy.ops.object.convert(target='MESH')
-        
-        # Apply initial rotation to make text face outward
-        text_obj.rotation_euler = (-math.pi/2, 0, 0)
-        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-        
-        # Get text bounds before curving
+
+        # Apply rotation to align text properly
+        text_obj.rotation_euler[0] = math.radians(-90)  # Rotate -90 degrees around X
+        bpy.ops.object.transform_apply(rotation=True, scale=True)
+
+        # Get the width of the text
+        bpy.ops.object.mode_set(mode='OBJECT')
         bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
         min_x = min([v.x for v in bbox_corners])
         max_x = max([v.x for v in bbox_corners])
         text_width = max_x - min_x
-        
+
         # Calculate the arc that the text will occupy
         text_angle_span = text_width / outer_radius
-        
-        # Add small padding (2 degrees on each side)
-        padding_angle = math.radians(2)
+
+        # Negative padding to eliminate gaps and merge a little bit
+        padding_angle = math.radians(-2)
         total_angle_span = text_angle_span + 2 * padding_angle
-        
+
         # Calculate start and end angles
         # Center the text at angle 0 (positive Y axis)
         self.text_start_angle = -total_angle_span / 2
         self.text_end_angle = total_angle_span / 2
-        
+
         self.log(f"Text arc: {math.degrees(self.text_start_angle):.2f}° to {math.degrees(self.text_end_angle):.2f}°")
         self.log(f"Text angular span: {math.degrees(total_angle_span):.2f}°")
-        
+
         # Curve the text around the ring
         success = self.curve_text_mesh(text_obj, outer_radius, text_direction)
-        
+
         if success:
             self.log(f"Created embossed text: '{text[:50]}{'...' if len(text) > 50 else ''}'")
             return text_obj
