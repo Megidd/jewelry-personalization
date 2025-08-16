@@ -370,12 +370,13 @@ class RingTextGenerator:
     def curve_text_mesh(self, text_obj, radius, text_direction):
         """Curve the text mesh around the ring with proper positioning"""
         text_config = self.config['text']
+        ring_config = self.config['ring']  # Add this to access ring dimensions
         mesh = text_obj.data
-        
+
         # Get text bounds
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
-        
+
         # Calculate bounding box
         bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
         min_x = min([v.x for v in bbox_corners])
@@ -384,25 +385,30 @@ class RingTextGenerator:
         max_y = max([v.y for v in bbox_corners])
         min_z = min([v.z for v in bbox_corners])
         max_z = max([v.z for v in bbox_corners])
-        
+
         text_width = max_x - min_x
         text_depth_actual = max_y - min_y
         text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
         text_center_z = (min_z + max_z) / 2
-        
-        # For embossed text, we need to position the back face at the surface
+
+        # Get inner radius
+        inner_radius = ring_config['inner_diameter'] / 2
+
+        # For text at inner radius level, we need to position it differently
+        # The text should be centered at the inner radius
         y_offset = -min_y  # This moves the back face to Y=0
-        
+
         self.log(f"Curving text around ring (width: {text_width:.2f}mm)")
         self.log(f"Text depth range: {min_y:.3f} to {max_y:.3f}mm, applying offset: {y_offset:.3f}mm")
-        
+        self.log(f"Positioning text at inner radius: {inner_radius:.2f}mm")
+
         # Apply curve deformation to vertices
         for vertex in mesh.vertices:
             x = vertex.co.x - text_center_x
             y = vertex.co.y + y_offset  # Apply the offset to normalize position
             z = vertex.co.z - text_center_z  # Center vertically
-            
+
             # Calculate angle for this vertex
             if text_direction == 'inverted':
                 # For inverted text, reverse the angle
@@ -410,28 +416,28 @@ class RingTextGenerator:
             else:
                 # Normal text direction
                 angle = (x / radius)
-            
+
             # Calculate radial position
-            # For embossed text, add to radius (going outward)
-            r = radius + y  # y will be >= 0, so this increases radius
-            
+            # Position text at inner radius level
+            r = inner_radius + y  # y will be >= 0, so this positions text starting from inner radius
+
             # Convert to cylindrical coordinates
             # Position at +Y axis intersection as per spec
             new_x = r * math.sin(angle)
             new_y = r * math.cos(angle)
             new_z = z
-            
+
             vertex.co = Vector((new_x, new_y, new_z))
-        
+
         # Update mesh
         mesh.update()
-        
+
         # Ensure proper normals
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.normals_make_consistent(inside=False)
         bpy.ops.object.mode_set(mode='OBJECT')
-        
+
         return True
     
     def create_partial_ring(self, start_angle, end_angle):
