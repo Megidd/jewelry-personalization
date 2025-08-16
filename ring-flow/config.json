@@ -10,7 +10,7 @@
     "content": "Emma",
     "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
     "font_size": 10.0,
-    "depth": 0.25,
+    "depth": 0.5,
     "direction": "normal"
   },
   "material": {
