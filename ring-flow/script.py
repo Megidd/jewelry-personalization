@@ -119,6 +119,10 @@ class RingTextGenerator:
                 self.log(f"ERROR: Missing required text field: {field}", "ERROR")
                 return False
         
+        # z_offset is not a required field, therefore,
+        # set default for z_offset if not specified
+        text_config.setdefault('z_offset', 0.0)
+
         # Validate output section
         output_config = self.config['output']
         if 'stl_filename' not in output_config:
@@ -131,9 +135,9 @@ class RingTextGenerator:
         # Validate material section if present
         if 'material' in self.config:
             material_config = self.config['material']
-            # Set default density if not specified (PLA default)
-            material_config.setdefault('density', 1.24)  # g/cm³
-            material_config.setdefault('name', 'PLA')
+            # Set default density if not specified (gold default)
+            material_config.setdefault('density', 19.3)  # g/cm³
+            material_config.setdefault('name', 'GOLD g/cm³')
             
             # Validate density
             if material_config['density'] <= 0:
@@ -384,12 +388,15 @@ class RingTextGenerator:
         text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
         
-        # MODIFIED: Align top of text with top of ring
+        # MODIFIED: Align top of text with top of ring, plus user-defined offset
         # Ring top is at Z = +length/2
         ring_top = ring_config['length'] / 2
         # We want text top (max_z) to align with ring top
         # So we need to shift text by (ring_top - max_z)
-        z_offset = ring_top - max_z
+        # Plus any user-defined z_offset (positive moves text up, negative moves down)
+        z_alignment_offset = ring_top - max_z
+        user_z_offset = text_config.get('z_offset', 0.0)
+        total_z_offset = z_alignment_offset + user_z_offset
 
         # Get inner radius
         inner_radius = ring_config['inner_diameter'] / 2
@@ -401,13 +408,15 @@ class RingTextGenerator:
         self.log(f"Curving text around ring (width: {text_width:.2f}mm)")
         self.log(f"Text depth range: {min_y:.3f} to {max_y:.3f}mm, applying offset: {y_offset:.3f}mm")
         self.log(f"Positioning text at inner radius: {inner_radius:.2f}mm")
-        self.log(f"Aligning text TOP with ring TOP: Z offset = {z_offset:.3f}mm")
+        self.log(f"Aligning text TOP with ring TOP: base Z offset = {z_alignment_offset:.3f}mm")
+        self.log(f"Applying user Z offset: {user_z_offset:.3f}mm")
+        self.log(f"Total Z offset: {total_z_offset:.3f}mm")
 
         # Apply curve deformation to vertices
         for vertex in mesh.vertices:
             x = vertex.co.x - text_center_x
             y = vertex.co.y + y_offset  # Apply the offset to normalize position
-            z = vertex.co.z + z_offset  # Apply Z offset to align top with ring top
+            z = vertex.co.z + total_z_offset  # Apply total Z offset (alignment + user offset)
 
             # Calculate angle for this vertex
             if text_direction == 'inverted':

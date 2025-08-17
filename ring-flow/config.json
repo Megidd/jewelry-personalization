@@ -11,7 +11,8 @@
     "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
     "font_size": 10.0,
     "depth": 0.5,
-    "direction": "normal"
+    "direction": "normal",
+    "z_offset": 0.5
   },
   "material": {
     "name": "GOLD g/cm³",
