@@ -8,11 +8,11 @@
   },
   "text": {
     "content": "Emma",
-    "font_path": "../fonts/TTFs/Pacifico/Pacifico-Regular.ttf",
+    "font_path": "../fonts/TTFs/Dancing_Script/static/DancingScript-Bold.ttf",
     "font_size": 10.0,
     "depth": 0.5,
     "direction": "normal",
-    "z_offset": 0.5
+    "z_offset": 1.0
   },
   "material": {
     "name": "GOLD g/cm³",
