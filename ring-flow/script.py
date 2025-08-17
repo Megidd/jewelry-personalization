@@ -383,7 +383,13 @@ class RingTextGenerator:
         text_depth_actual = max_y - min_y
         text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
-        text_center_z = (min_z + max_z) / 2
+        
+        # MODIFIED: Instead of centering vertically, we'll align bottom of text with bottom of ring
+        # Ring bottom is at Z = -length/2
+        ring_bottom = -ring_config['length'] / 2
+        # We want text bottom (min_z) to align with ring bottom
+        # So we need to shift text by (ring_bottom - min_z)
+        z_offset = ring_bottom - min_z
 
         # Get inner radius
         inner_radius = ring_config['inner_diameter'] / 2
@@ -395,12 +401,13 @@ class RingTextGenerator:
         self.log(f"Curving text around ring (width: {text_width:.2f}mm)")
         self.log(f"Text depth range: {min_y:.3f} to {max_y:.3f}mm, applying offset: {y_offset:.3f}mm")
         self.log(f"Positioning text at inner radius: {inner_radius:.2f}mm")
+        self.log(f"Aligning text bottom with ring bottom: Z offset = {z_offset:.3f}mm")
 
         # Apply curve deformation to vertices
         for vertex in mesh.vertices:
             x = vertex.co.x - text_center_x
             y = vertex.co.y + y_offset  # Apply the offset to normalize position
-            z = vertex.co.z - text_center_z  # Center vertically
+            z = vertex.co.z + z_offset  # MODIFIED: Apply Z offset to align bottom with ring bottom
 
             # Calculate angle for this vertex
             if text_direction == 'inverted':
