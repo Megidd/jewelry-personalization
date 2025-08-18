@@ -319,7 +319,7 @@ class RingTextGenerator:
         text_curve.bevel_depth = 0
         text_curve.align_x = 'CENTER'
         text_curve.align_y = 'CENTER'
-        text_curve.space_character = 0.95  # Reduce to 0.7-0.9 for tighter spacing
+        text_curve.space_character = 0.95  # Reduce to 0.7-1.0 for tighter spacing
         text_curve.space_word = 0.95  # Adjust word spacing if needed
         # Add bevel to make characters thicker
         text_curve.bevel_depth = 0.04  # Small bevel (in Blender units)
