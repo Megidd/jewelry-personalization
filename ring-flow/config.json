@@ -20,7 +20,9 @@
     "font_size": 10.0,
     "depth": 0.5,
     "direction": "normal",
-    "z_offset": 1.0
+    "z_offset": 1.0,
+    "space_character": 0.95,
+    "space_word": 0.95
   },
   "material": {
     "name": "GOLD g/cm³",

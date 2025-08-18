@@ -123,6 +123,21 @@ class RingTextGenerator:
         # set default for z_offset if not specified
         text_config.setdefault('z_offset', 0.0)
 
+        # Set defaults for spacing parameters if not specified
+        text_config.setdefault('space_character', 0.95)
+        text_config.setdefault('space_word', 0.95)
+
+        # Validate spacing parameters
+        if 'space_character' in text_config:
+            space_char = text_config['space_character']
+            if not (0.0 <= space_char <= 2.0):
+                self.log(f"WARNING: space_character ({space_char}) is outside recommended range 0.0-2.0", "WARNING")
+
+        if 'space_word' in text_config:
+            space_word = text_config['space_word']
+            if not (0.0 <= space_word <= 2.0):
+                self.log(f"WARNING: space_word ({space_word}) is outside recommended range 0.0-2.0", "WARNING")
+
         # Validate output section
         output_config = self.config['output']
         if 'stl_filename' not in output_config:
@@ -319,8 +334,8 @@ class RingTextGenerator:
         text_curve.bevel_depth = 0
         text_curve.align_x = 'CENTER'
         text_curve.align_y = 'CENTER'
-        text_curve.space_character = 0.95  # Reduce to 0.7-1.0 for tighter spacing
-        text_curve.space_word = 0.95  # Adjust word spacing if needed
+        text_curve.space_character = self.config['text']['space_character']  # From config
+        text_curve.space_word = self.config['text']['space_word']  # From config
         # Add bevel to make characters thicker
         text_curve.bevel_depth = 0.04  # Small bevel (in Blender units)
         text_curve.bevel_resolution = 2  # Low resolution for performance
