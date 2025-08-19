@@ -118,10 +118,6 @@ class RingTextGenerator:
             if field not in text_config:
                 self.log(f"ERROR: Missing required text field: {field}", "ERROR")
                 return False
-        
-        # z_offset is not a required field, therefore,
-        # set default for z_offset if not specified
-        text_config.setdefault('z_offset', 0.0)
 
         # Set defaults for spacing parameters if not specified
         text_config.setdefault('space_character', 0.95)
@@ -394,7 +390,7 @@ class RingTextGenerator:
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
 
-        # Calculate bounding box
+        # Auto-center text vertically on ring
         bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
         min_x = min([v.x for v in bbox_corners])
         max_x = max([v.x for v in bbox_corners])
@@ -402,21 +398,13 @@ class RingTextGenerator:
         max_y = max([v.y for v in bbox_corners])
         min_z = min([v.z for v in bbox_corners])
         max_z = max([v.z for v in bbox_corners])
-
-        text_width = max_x - min_x
-        text_depth_actual = max_y - min_y
-        text_height = max_z - min_z
         text_center_x = (min_x + max_x) / 2
-        
-        # MODIFIED: Align top of text with top of ring, plus user-defined offset
-        # Ring top is at Z = +length/2
-        ring_top = ring_config['length'] / 2
-        # We want text top (max_z) to align with ring top
-        # So we need to shift text by (ring_top - max_z)
-        # Plus any user-defined z_offset (positive moves text up, negative moves down)
-        z_alignment_offset = ring_top - max_z
-        user_z_offset = text_config.get('z_offset', 0.0)
-        total_z_offset = z_alignment_offset + user_z_offset
+        text_center_z = (min_z + max_z) / 2
+
+        # Ring is centered at z=0, so offset to center text
+        total_z_offset = -text_center_z
+
+        self.log(f"Auto-centering text: z_offset = {total_z_offset:.3f}mm")
 
         # Get inner radius
         inner_radius = ring_config['inner_diameter'] / 2
@@ -425,11 +413,8 @@ class RingTextGenerator:
         # The text should be centered at the inner radius
         y_offset = -min_y  # This moves the back face to Y=0
 
-        self.log(f"Curving text around ring (width: {text_width:.2f}mm)")
         self.log(f"Text depth range: {min_y:.3f} to {max_y:.3f}mm, applying offset: {y_offset:.3f}mm")
         self.log(f"Positioning text at inner radius: {inner_radius:.2f}mm")
-        self.log(f"Aligning text TOP with ring TOP: base Z offset = {z_alignment_offset:.3f}mm")
-        self.log(f"Applying user Z offset: {user_z_offset:.3f}mm")
         self.log(f"Total Z offset: {total_z_offset:.3f}mm")
 
         # Apply curve deformation to vertices

@@ -20,7 +20,6 @@
     "font_size": 10.0,
     "depth": 0.5,
     "direction": "normal",
-    "z_offset": 1.0,
     "_space_character_comment": "Determines the overlap of text characters. Reduce to 0.7-1.0 for tighter text",
     "space_character": 0.95,
     "space_word": 0.95
