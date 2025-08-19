@@ -379,7 +379,38 @@ class RingTextGenerator:
             return text_obj
         else:
             return None
-    
+
+    def calculate_mesh_centroid_z_area_weighted(self, mesh_obj):
+        """Calculate Z-centroid using area-weighted vertex positions"""
+        mesh = mesh_obj.data
+        mesh.update()
+        
+        # Initialize vertex weights
+        vertex_weights = [0.0] * len(mesh.vertices)
+        
+        # Calculate area contribution for each vertex
+        for poly in mesh.polygons:
+            area = poly.area
+            area_per_vertex = area / len(poly.vertices)
+            
+            for vertex_index in poly.vertices:
+                vertex_weights[vertex_index] += area_per_vertex
+        
+        # Calculate weighted average
+        total_weighted_z = 0.0
+        total_weight = 0.0
+        
+        for i, vertex in enumerate(mesh.vertices):
+            weight = vertex_weights[i]
+            total_weighted_z += vertex.co.z * weight
+            total_weight += weight
+        
+        if total_weight > 0:
+            return total_weighted_z / total_weight
+        else:
+            # Fallback to simple average
+            return sum(v.co.z for v in mesh.vertices) / len(mesh.vertices)
+
     def curve_text_mesh(self, text_obj, radius, text_direction):
         """Curve the text mesh around the ring with proper positioning"""
         text_config = self.config['text']
@@ -390,21 +421,20 @@ class RingTextGenerator:
         text_obj.select_set(True)
         bpy.context.view_layer.objects.active = text_obj
 
-        # Auto-center text vertically on ring
+        # Auto-center text vertically on ring using vertex-based centroid
         bbox_corners = [text_obj.matrix_world @ Vector(corner) for corner in text_obj.bound_box]
         min_x = min([v.x for v in bbox_corners])
         max_x = max([v.x for v in bbox_corners])
         min_y = min([v.y for v in bbox_corners])
         max_y = max([v.y for v in bbox_corners])
-        min_z = min([v.z for v in bbox_corners])
-        max_z = max([v.z for v in bbox_corners])
+        
         text_center_x = (min_x + max_x) / 2
-        text_center_z = (min_z + max_z) / 2
+        
+        # Use vertex-based centroid for Z centering
+        text_centroid_z = self.calculate_mesh_centroid_z_area_weighted(text_obj)
+        total_z_offset = -text_centroid_z
 
-        # Ring is centered at z=0, so offset to center text
-        total_z_offset = -text_center_z
-
-        self.log(f"Auto-centering text: z_offset = {total_z_offset:.3f}mm")
+        self.log(f"Auto-centering text using vertex centroid: z_offset = {total_z_offset:.3f}mm")
 
         # Get inner radius
         inner_radius = ring_config['inner_diameter'] / 2
