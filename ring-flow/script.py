@@ -164,17 +164,20 @@ class RingTextGenerator:
         # Validate font path
         font_path = text_config['font_path']
         if not os.path.isabs(font_path):
-            font_path = self.config_dir / font_path
-        font_path = Path(font_path).resolve()
-        
+            # Use Path for proper cross-platform handling
+            font_path = (self.config_dir / font_path).resolve()
+        else:
+            font_path = Path(font_path).resolve()
+
         if not font_path.exists():
             self.log(f"ERROR: Font file not found: {font_path}", "ERROR")
             return False
-        
+
         if not font_path.suffix.lower() in ['.ttf', '.otf']:
             self.log(f"ERROR: Font file must be TTF or OTF format: {font_path}", "ERROR")
             return False
-        
+
+        # Store the resolved path as a string for Blender
         text_config['_resolved_font_path'] = str(font_path)
         
         # Validate text content
@@ -306,7 +309,8 @@ class RingTextGenerator:
     def create_text_and_calculate_arc(self):
         """Create embossed text and calculate the arc it will occupy"""
         text = self.config['text']['content']
-        font_path = self.config['text']['font_path']
+        # Use the resolved font path instead of the original
+        font_path = self.config['text'].get('_resolved_font_path', self.config['text']['font_path'])
         font_size = self.config['text']['font_size']
         text_depth = self.config['text']['depth']
         outer_radius = self.config['ring']['outer_diameter'] / 2
