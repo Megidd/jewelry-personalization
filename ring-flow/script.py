@@ -363,17 +363,13 @@ class RingTextGenerator:
         # Calculate the arc that the text will occupy
         text_angle_span = text_width / outer_radius
 
-        # Negative padding to eliminate gaps and merge a little bit
-        padding_angle = math.radians(-2)
-        total_angle_span = text_angle_span + 2 * padding_angle
-
         # Calculate start and end angles
         # Center the text at angle 0 (positive Y axis)
-        self.text_start_angle = -total_angle_span / 2
-        self.text_end_angle = total_angle_span / 2
+        self.text_start_angle = -text_angle_span / 2
+        self.text_end_angle = text_angle_span / 2
 
         self.log(f"Text arc: {math.degrees(self.text_start_angle):.2f}° to {math.degrees(self.text_end_angle):.2f}°")
-        self.log(f"Text angular span: {math.degrees(total_angle_span):.2f}°")
+        self.log(f"Text angular span: {math.degrees(text_angle_span):.2f}°")
 
         # Curve the text around the ring
         success = self.curve_text_mesh(text_obj, outer_radius, text_direction)
