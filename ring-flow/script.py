@@ -485,77 +485,60 @@ class RingTextGenerator:
         return True
 
     def calculate_required_overlap(self, text_obj, text_start_angle, text_end_angle):
-        """Calculate the required overlap based on actual text geometry"""
+        """Calculate minimum overlap needed for reliable connection"""
         mesh = text_obj.data
         mesh.update()
 
-        # Manufacturing parameters
-        min_overlap_thickness = 0.5  # mm - minimum material overlap for strength
-        manufacturing_tolerance = 0.2  # mm - account for printing/casting tolerances
+        # Manufacturing parameters - reduced for aesthetics
+        min_overlap_thickness = 0.3  # mm - reduced from 0.5
+        manufacturing_tolerance = 0.1  # mm - reduced from 0.2
 
-        # Sample points near the text boundaries to find actual geometry extent
-        # We'll check multiple radial positions to find where text actually exists
-
-        def get_text_extent_at_angle(angle, tolerance_angle=math.radians(5)):
-            """Find the radial extent of text near a given angle"""
-            min_radius = float('inf')
-            max_radius = 0
-
-            # Check vertices within a small angular range
-            for vertex in mesh.vertices:
-                # Convert to cylindrical coordinates
-                x, y, z = vertex.co
-                vertex_radius = math.sqrt(x*x + y*y)
-                vertex_angle = math.atan2(x, y)
-
-                # Normalize angle to [0, 2π]
-                while vertex_angle < 0:
-                    vertex_angle += 2 * math.pi
-                while vertex_angle >= 2 * math.pi:
-                    vertex_angle -= 2 * math.pi
-
-                # Check if vertex is near our target angle
-                angle_diff = abs(vertex_angle - angle)
-                # Handle wrap-around
-                if angle_diff > math.pi:
-                    angle_diff = 2 * math.pi - angle_diff
-
-                if angle_diff < tolerance_angle:
-                    min_radius = min(min_radius, vertex_radius)
-                    max_radius = max(max_radius, vertex_radius)
-
-            return min_radius, max_radius
-
-        # Get text extent at start and end positions
-        start_min_r, start_max_r = get_text_extent_at_angle(text_start_angle)
-        end_min_r, end_max_r = get_text_extent_at_angle(text_end_angle)
-
-        # Calculate angular overlap needed
-        # The overlap angle depends on the radial thickness of the text
         ring_inner_radius = self.config['ring']['inner_diameter'] / 2
         ring_outer_radius = self.config['ring']['outer_diameter'] / 2
 
-        # We need enough angular overlap to ensure material connection
-        # This is based on the chord length at the inner radius
-        required_chord_length = min_overlap_thickness + manufacturing_tolerance
+        # Find the actual text thickness at the boundaries
+        def get_text_thickness_at_angle(angle):
+            """Find the radial thickness of text at a given angle"""
+            vertices_at_angle = []
 
-        # Calculate angle from chord length: chord = 2 * r * sin(angle/2)
-        # angle = 2 * arcsin(chord / (2 * r))
-        overlap_angle_inner = 2 * math.asin(min(1.0, required_chord_length / (2 * ring_inner_radius)))
-        overlap_angle_outer = 2 * math.asin(min(1.0, required_chord_length / (2 * ring_outer_radius)))
+            for vertex in mesh.vertices:
+                x, y, z = vertex.co
+                vertex_angle = math.atan2(x, y)
 
-        # Use the larger of the two angles for safety
-        overlap_angle = max(overlap_angle_inner, overlap_angle_outer)
+                # Check if vertex is near our target angle (within 2 degrees)
+                angle_diff = abs(vertex_angle - angle)
+                if angle_diff < math.radians(2):
+                    radius = math.sqrt(x*x + y*y)
+                    vertices_at_angle.append(radius)
 
-        # Add extra safety factor based on text characteristics
-        if start_max_r > ring_inner_radius or end_max_r > ring_inner_radius:
-            # Text extends beyond inner radius, need more overlap
-            overlap_angle *= 1.5
+            if vertices_at_angle:
+                return max(vertices_at_angle) - min(vertices_at_angle)
+            return 0
 
-        self.log(f"Calculated overlap angle: {math.degrees(overlap_angle):.2f}°")
-        self.log(f"Based on min overlap thickness: {min_overlap_thickness}mm")
-        self.log(f"Text extent at start: r={start_min_r:.2f}-{start_max_r:.2f}mm")
-        self.log(f"Text extent at end: r={end_min_r:.2f}-{end_max_r:.2f}mm")
+        # Get text thickness at boundaries
+        start_thickness = get_text_thickness_at_angle(text_start_angle)
+        end_thickness = get_text_thickness_at_angle(text_end_angle)
+
+        # Calculate overlap based on the thinner boundary
+        # This prevents over-penetration in thin areas
+        min_thickness = min(start_thickness, end_thickness) if start_thickness > 0 and end_thickness > 0 else ring_outer_radius - ring_inner_radius
+
+        # Overlap should be proportional to text thickness
+        # but never less than minimum required
+        required_overlap = max(
+            min_overlap_thickness + manufacturing_tolerance,
+            min_thickness * 0.3  # 30% of text thickness
+        )
+
+        # Convert to angle
+        overlap_angle = required_overlap / ring_inner_radius
+
+        # Cap maximum overlap to prevent aesthetic issues
+        max_overlap_angle = math.radians(3.0)  # Maximum 3 degrees
+        overlap_angle = min(overlap_angle, max_overlap_angle)
+
+        self.log(f"Text thickness at boundaries: start={start_thickness:.2f}mm, end={end_thickness:.2f}mm")
+        self.log(f"Calculated overlap: {math.degrees(overlap_angle):.2f}°")
 
         return overlap_angle
 
