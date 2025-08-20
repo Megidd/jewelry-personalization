@@ -492,56 +492,68 @@ class RingTextGenerator:
         length = ring_config['length']
         radial_segments = ring_config['radial_segments']
         vertical_segments = ring_config['vertical_segments']
-        
+
+        # OVERLAP CONFIGURATION
+        # Define overlap amount in degrees (adjust as needed for your manufacturing process)
+        # Typical values: 1-3 degrees for 3D printing, 2-5 degrees for metal casting
+        overlap_degrees = 2.0  # degrees
+        overlap_radians = math.radians(overlap_degrees)
+
+        # Extend the ring angles to create overlap with text
         # The ring goes from text end to text start (wrapping around)
-        # This means from end_angle to start_angle + 2π
-        ring_start = end_angle
-        ring_end = start_angle + 2 * math.pi
+        # We subtract overlap from start and add overlap to end to extend into text territory
+        ring_start = end_angle - overlap_radians  # Extend backward into text end
+        ring_end = start_angle + 2 * math.pi + overlap_radians  # Extend forward into text start
         ring_span = ring_end - ring_start
-        
+
+        # Log the overlap information
+        self.log(f"Adding {overlap_degrees}° overlap on each end for manufacturing reliability")
+        self.log(f"Original ring arc: {math.degrees(end_angle):.2f}° to {math.degrees(start_angle + 2 * math.pi):.2f}°")
+        self.log(f"Extended ring arc: {math.degrees(ring_start):.2f}° to {math.degrees(ring_end):.2f}°")
+
         # Calculate segments for this partial ring
         segments_for_arc = max(3, int(radial_segments * ring_span / (2 * math.pi)))
-        
-        self.log(f"Creating partial ring from {math.degrees(ring_start):.2f}° to {math.degrees(ring_end):.2f}°")
-        self.log(f"Ring arc span: {math.degrees(ring_span):.2f}°")
+
+        self.log(f"Creating partial ring with overlap from {math.degrees(ring_start):.2f}° to {math.degrees(ring_end):.2f}°")
+        self.log(f"Ring arc span (with overlap): {math.degrees(ring_span):.2f}°")
         self.log(f"Using {segments_for_arc} radial segments for the arc")
-        
+
         # Create mesh
         mesh = bpy.data.meshes.new(name="PartialRing")
         ring_obj = bpy.data.objects.new("PartialRing", mesh)
         bpy.context.collection.objects.link(ring_obj)
-        
+
         # Create geometry using bmesh
         bm = bmesh.new()
-        
+
         # Create vertices for rings at different heights
         for v_idx in range(vertical_segments + 1):
             z = -length/2 + (length * v_idx / vertical_segments)
-            
+
             # Outer circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
                 x = outer_radius * math.sin(angle)
                 y = outer_radius * math.cos(angle)
                 bm.verts.new((x, y, z))
-            
+
             # Inner circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
                 x = inner_radius * math.sin(angle)
                 y = inner_radius * math.cos(angle)
                 bm.verts.new((x, y, z))
-        
+
         bm.verts.ensure_lookup_table()
-        
+
         # Create faces
         verts_per_ring = (segments_for_arc + 1) * 2
-        
+
         # Side faces
         for v_idx in range(vertical_segments):
             ring_offset = v_idx * verts_per_ring
             next_ring_offset = (v_idx + 1) * verts_per_ring
-            
+
             # Outer surface
             for r_idx in range(segments_for_arc):
                 v1 = bm.verts[ring_offset + r_idx]
@@ -549,7 +561,7 @@ class RingTextGenerator:
                 v3 = bm.verts[next_ring_offset + r_idx + 1]
                 v4 = bm.verts[next_ring_offset + r_idx]
                 bm.faces.new([v1, v2, v3, v4])
-            
+
             # Inner surface
             inner_start = segments_for_arc + 1
             for r_idx in range(segments_for_arc):
@@ -558,7 +570,7 @@ class RingTextGenerator:
                 v3 = bm.verts[next_ring_offset + inner_start + r_idx + 1]
                 v4 = bm.verts[ring_offset + inner_start + r_idx + 1]
                 bm.faces.new([v1, v2, v3, v4])
-        
+
         # Top face
         top_offset = vertical_segments * verts_per_ring
         for r_idx in range(segments_for_arc):
@@ -567,7 +579,7 @@ class RingTextGenerator:
             v3 = bm.verts[top_offset + segments_for_arc + 1 + r_idx + 1]
             v4 = bm.verts[top_offset + segments_for_arc + 1 + r_idx]
             bm.faces.new([v1, v2, v3, v4])
-        
+
         # Bottom face
         for r_idx in range(segments_for_arc):
             v1 = bm.verts[r_idx]
@@ -575,42 +587,42 @@ class RingTextGenerator:
             v3 = bm.verts[segments_for_arc + 1 + r_idx + 1]
             v4 = bm.verts[r_idx + 1]
             bm.faces.new([v1, v2, v3, v4])
-        
+
         # End caps (where the arc starts and ends)
         # Start cap
         for v_idx in range(vertical_segments):
             ring_offset = v_idx * verts_per_ring
             next_ring_offset = (v_idx + 1) * verts_per_ring
-            
+
             v1 = bm.verts[ring_offset + 0]  # outer, current height
             v2 = bm.verts[ring_offset + segments_for_arc + 1]  # inner, current height
             v3 = bm.verts[next_ring_offset + segments_for_arc + 1]  # inner, next height
             v4 = bm.verts[next_ring_offset + 0]  # outer, next height
             bm.faces.new([v1, v2, v3, v4])
-        
+
         # End cap
         for v_idx in range(vertical_segments):
             ring_offset = v_idx * verts_per_ring
             next_ring_offset = (v_idx + 1) * verts_per_ring
-            
+
             v1 = bm.verts[ring_offset + segments_for_arc]  # outer, current height
             v2 = bm.verts[next_ring_offset + segments_for_arc]  # outer, next height
             v3 = bm.verts[next_ring_offset + segments_for_arc + 1 + segments_for_arc]  # inner, next height
             v4 = bm.verts[ring_offset + segments_for_arc + 1 + segments_for_arc]  # inner, current height
             bm.faces.new([v1, v2, v3, v4])
-        
+
         # Update mesh
         bm.to_mesh(mesh)
         bm.free()
-        
+
         # Apply smooth shading
         ring_obj.select_set(True)
         bpy.context.view_layer.objects.active = ring_obj
         bpy.ops.object.shade_smooth()
-        
-        self.log(f"Created partial ring: inner_d={ring_config['inner_diameter']}mm, "
+
+        self.log(f"Created partial ring with {overlap_degrees}° overlap: inner_d={ring_config['inner_diameter']}mm, "
                 f"outer_d={ring_config['outer_diameter']}mm, length={ring_config['length']}mm")
-        
+
         return ring_obj
     
     def calculate_mesh_volume(self, mesh_obj):
