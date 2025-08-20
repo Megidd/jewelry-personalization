@@ -587,14 +587,14 @@ class RingTextGenerator:
             # Outer circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
-                x = outer_radius * math.sin(angle)
+                x = -outer_radius * math.sin(angle)
                 y = outer_radius * math.cos(angle)
                 bm.verts.new((x, y, z))
 
             # Inner circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
-                x = inner_radius * math.sin(angle)
+                x = -inner_radius * math.sin(angle)
                 y = inner_radius * math.cos(angle)
                 bm.verts.new((x, y, z))
 
