@@ -364,9 +364,11 @@ class RingTextGenerator:
         text_angle_span = text_width / outer_radius
 
         # Calculate start and end angles
-        # Center the text at angle 0 (positive Y axis)
-        self.text_start_angle = -text_angle_span / 2
-        self.text_end_angle = text_angle_span / 2
+        # Center the text at angle PI/2 (positive Y axis)
+        # NOTE: Angle zero is at +X
+        # NOTE: Angle positive direction is from +X towards +Y
+        self.text_start_angle = math.pi / 2 - text_angle_span / 2
+        self.text_end_angle = math.pi / 2 + text_angle_span / 2
 
         self.log(f"Text arc: {math.degrees(self.text_start_angle):.2f}° to {math.degrees(self.text_end_angle):.2f}°")
         self.log(f"Text angular span: {math.degrees(text_angle_span):.2f}°")
@@ -587,15 +589,15 @@ class RingTextGenerator:
             # Outer circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
-                x = -outer_radius * math.sin(angle)
-                y = outer_radius * math.cos(angle)
+                x = outer_radius * math.cos(angle)
+                y = outer_radius * math.sin(angle)
                 bm.verts.new((x, y, z))
 
             # Inner circle arc
             for r_idx in range(segments_for_arc + 1):
                 angle = ring_start + (ring_span * r_idx / segments_for_arc)
-                x = -inner_radius * math.sin(angle)
-                y = inner_radius * math.cos(angle)
+                x = inner_radius * math.cos(angle)
+                y = inner_radius * math.sin(angle)
                 bm.verts.new((x, y, z))
 
         bm.verts.ensure_lookup_table()
