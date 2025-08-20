@@ -498,7 +498,7 @@ class RingTextGenerator:
         # Get text content and calculate junction angle difference
         text_content = self.config['text']['content']
         num_letters = len(text_content)
-        junction_angle_diff = (text_end_angle - text_start_angle) / num_letters / 2
+        junction_angle_diff = (text_end_angle - text_start_angle) / num_letters
 
         self.log(f"Text has {num_letters} letters, junction_angle_diff = {math.degrees(junction_angle_diff):.2f}°")
 
