@@ -483,8 +483,83 @@ class RingTextGenerator:
         bpy.ops.object.mode_set(mode='OBJECT')
 
         return True
-    
-    def create_partial_ring(self, start_angle, end_angle):
+
+    def calculate_required_overlap(self, text_obj, text_start_angle, text_end_angle):
+        """Calculate the required overlap based on actual text geometry"""
+        mesh = text_obj.data
+        mesh.update()
+
+        # Manufacturing parameters
+        min_overlap_thickness = 0.5  # mm - minimum material overlap for strength
+        manufacturing_tolerance = 0.2  # mm - account for printing/casting tolerances
+
+        # Sample points near the text boundaries to find actual geometry extent
+        # We'll check multiple radial positions to find where text actually exists
+
+        def get_text_extent_at_angle(angle, tolerance_angle=math.radians(5)):
+            """Find the radial extent of text near a given angle"""
+            min_radius = float('inf')
+            max_radius = 0
+
+            # Check vertices within a small angular range
+            for vertex in mesh.vertices:
+                # Convert to cylindrical coordinates
+                x, y, z = vertex.co
+                vertex_radius = math.sqrt(x*x + y*y)
+                vertex_angle = math.atan2(x, y)
+
+                # Normalize angle to [0, 2π]
+                while vertex_angle < 0:
+                    vertex_angle += 2 * math.pi
+                while vertex_angle >= 2 * math.pi:
+                    vertex_angle -= 2 * math.pi
+
+                # Check if vertex is near our target angle
+                angle_diff = abs(vertex_angle - angle)
+                # Handle wrap-around
+                if angle_diff > math.pi:
+                    angle_diff = 2 * math.pi - angle_diff
+
+                if angle_diff < tolerance_angle:
+                    min_radius = min(min_radius, vertex_radius)
+                    max_radius = max(max_radius, vertex_radius)
+
+            return min_radius, max_radius
+
+        # Get text extent at start and end positions
+        start_min_r, start_max_r = get_text_extent_at_angle(text_start_angle)
+        end_min_r, end_max_r = get_text_extent_at_angle(text_end_angle)
+
+        # Calculate angular overlap needed
+        # The overlap angle depends on the radial thickness of the text
+        ring_inner_radius = self.config['ring']['inner_diameter'] / 2
+        ring_outer_radius = self.config['ring']['outer_diameter'] / 2
+
+        # We need enough angular overlap to ensure material connection
+        # This is based on the chord length at the inner radius
+        required_chord_length = min_overlap_thickness + manufacturing_tolerance
+
+        # Calculate angle from chord length: chord = 2 * r * sin(angle/2)
+        # angle = 2 * arcsin(chord / (2 * r))
+        overlap_angle_inner = 2 * math.asin(min(1.0, required_chord_length / (2 * ring_inner_radius)))
+        overlap_angle_outer = 2 * math.asin(min(1.0, required_chord_length / (2 * ring_outer_radius)))
+
+        # Use the larger of the two angles for safety
+        overlap_angle = max(overlap_angle_inner, overlap_angle_outer)
+
+        # Add extra safety factor based on text characteristics
+        if start_max_r > ring_inner_radius or end_max_r > ring_inner_radius:
+            # Text extends beyond inner radius, need more overlap
+            overlap_angle *= 1.5
+
+        self.log(f"Calculated overlap angle: {math.degrees(overlap_angle):.2f}°")
+        self.log(f"Based on min overlap thickness: {min_overlap_thickness}mm")
+        self.log(f"Text extent at start: r={start_min_r:.2f}-{start_max_r:.2f}mm")
+        self.log(f"Text extent at end: r={end_min_r:.2f}-{end_max_r:.2f}mm")
+
+        return overlap_angle
+
+    def create_partial_ring(self, start_angle, end_angle, text_obj):
         """Create a partial ring from end_angle to start_angle (to fill the gap left by text)"""
         ring_config = self.config['ring']
         inner_radius = ring_config['inner_diameter'] / 2
@@ -493,15 +568,11 @@ class RingTextGenerator:
         radial_segments = ring_config['radial_segments']
         vertical_segments = ring_config['vertical_segments']
 
-        # OVERLAP CONFIGURATION
-        # Define overlap amount in degrees (adjust as needed for your manufacturing process)
-        # Typical values: 1-3 degrees for 3D printing, 2-5 degrees for metal casting
-        overlap_degrees = 2.0  # degrees
-        overlap_radians = math.radians(overlap_degrees)
+        # Calculate required overlap based on actual text geometry
+        overlap_radians = self.calculate_required_overlap(text_obj, start_angle, end_angle)
+        overlap_degrees = math.degrees(overlap_radians)
 
         # Extend the ring angles to create overlap with text
-        # The ring goes from text end to text start (wrapping around)
-        # We subtract overlap from start and add overlap to end to extend into text territory
         ring_start = end_angle - overlap_radians  # Extend backward into text end
         ring_end = start_angle + 2 * math.pi + overlap_radians  # Extend forward into text start
         ring_span = ring_end - ring_start
@@ -930,7 +1001,7 @@ class RingTextGenerator:
             
             # Create partial ring based on text arc
             self.log("Creating partial ring geometry...")
-            ring_obj = self.create_partial_ring(self.text_start_angle, self.text_end_angle)
+            ring_obj = self.create_partial_ring(self.text_start_angle, self.text_end_angle, text_obj)
             if not ring_obj:
                 self.log("ERROR: Failed to create ring", "ERROR")
                 return 3  # Blender operation error
