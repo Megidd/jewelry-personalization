@@ -487,62 +487,132 @@ class RingTextGenerator:
         return True
 
     def calculate_required_overlap(self, text_obj, text_start_angle, text_end_angle):
-        """Calculate minimum overlap needed for reliable connection"""
+        """Calculate overlap angles needed at both start and end of text"""
         mesh = text_obj.data
         mesh.update()
 
-        # Manufacturing parameters - reduced for aesthetics
-        min_overlap_thickness = 0.3  # mm - reduced from 0.5
-        manufacturing_tolerance = 0.1  # mm - reduced from 0.2
-
         ring_inner_radius = self.config['ring']['inner_diameter'] / 2
         ring_outer_radius = self.config['ring']['outer_diameter'] / 2
+        ring_length = self.config['ring']['length']
 
-        # Find the actual text thickness at the boundaries
-        def get_text_thickness_at_angle(angle):
-            """Find the radial thickness of text at a given angle"""
-            vertices_at_angle = []
+        # Get text content and calculate junction angle difference
+        text_content = self.config['text']['content']
+        num_letters = len(text_content)
+        junction_angle_diff = (text_end_angle - text_start_angle) / num_letters / 2
+
+        self.log(f"Text has {num_letters} letters, junction_angle_diff = {math.degrees(junction_angle_diff):.2f}°")
+
+        def get_vertices_in_range(angle_min, angle_max):
+            """Get vertices within specified angular range"""
+            vertices_in_range = []
 
             for vertex in mesh.vertices:
                 x, y, z = vertex.co
-                vertex_angle = math.atan2(x, y)
 
-                # Check if vertex is near our target angle (within 2 degrees)
-                angle_diff = abs(vertex_angle - angle)
-                if angle_diff < math.radians(2):
-                    radius = math.sqrt(x*x + y*y)
-                    vertices_at_angle.append(radius)
+                # Calculate polar coordinates
+                radius = math.sqrt(x*x + y*y)
+                angle = math.atan2(x, y)  # Note: atan2(x, y) since angle 0 is at +X
 
-            if vertices_at_angle:
-                return max(vertices_at_angle) - min(vertices_at_angle)
-            return 0
+                # Check if vertex is within the spatial range (inclusive boundaries)
+                if (angle_min <= angle <= angle_max and
+                    ring_inner_radius <= radius <= ring_outer_radius and
+                    -ring_length/2 <= z <= ring_length/2):
+                    vertices_in_range.append(vertex)
 
-        # Get text thickness at boundaries
-        start_thickness = get_text_thickness_at_angle(text_start_angle)
-        end_thickness = get_text_thickness_at_angle(text_end_angle)
+            return vertices_in_range
 
-        # Calculate overlap based on the thinner boundary
-        # This prevents over-penetration in thin areas
-        min_thickness = min(start_thickness, end_thickness) if start_thickness > 0 and end_thickness > 0 else ring_outer_radius - ring_inner_radius
+        def calculate_angle_centroid_area_weighted(vertices):
+            """Calculate area-weighted angle centroid of vertices"""
+            if not vertices:
+                return None
 
-        # Overlap should be proportional to text thickness
-        # but never less than minimum required
-        required_overlap = max(
-            min_overlap_thickness + manufacturing_tolerance,
-            min_thickness * 0.3  # 30% of text thickness
-        )
+            # Build vertex index set for quick lookup
+            vertex_indices = {v.index for v in vertices}
 
-        # Convert to angle
-        overlap_angle = required_overlap / ring_inner_radius
+            # Initialize vertex weights
+            vertex_weights = {v.index: 0.0 for v in vertices}
+
+            # Calculate area contribution for each vertex
+            for poly in mesh.polygons:
+                # Check if polygon has any vertices in our set
+                poly_vertices_in_set = [v for v in poly.vertices if v in vertex_indices]
+
+                if poly_vertices_in_set:
+                    area = poly.area
+                    area_per_vertex = area / len(poly.vertices)
+
+                    for vertex_index in poly_vertices_in_set:
+                        vertex_weights[vertex_index] += area_per_vertex
+
+            # Calculate weighted average angle
+            total_weighted_x = 0.0
+            total_weighted_y = 0.0
+            total_weight = 0.0
+
+            for vertex in vertices:
+                weight = vertex_weights[vertex.index]
+                if weight > 0:
+                    x, y, z = vertex.co
+                    total_weighted_x += x * weight
+                    total_weighted_y += y * weight
+                    total_weight += weight
+
+            if total_weight > 0:
+                # Calculate angle from weighted centroid
+                centroid_x = total_weighted_x / total_weight
+                centroid_y = total_weighted_y / total_weight
+                return math.atan2(centroid_x, centroid_y)
+            else:
+                # Fallback to simple average
+                sum_x = sum(v.co.x for v in vertices)
+                sum_y = sum(v.co.y for v in vertices)
+                if sum_x == 0 and sum_y == 0:
+                    return None
+                return math.atan2(sum_x, sum_y)
+
+        # Calculate overlap for text start
+        start_range_min = text_start_angle
+        start_range_max = text_start_angle + junction_angle_diff
+
+        vertices_at_start = get_vertices_in_range(start_range_min, start_range_max)
+        self.log(f"Found {len(vertices_at_start)} vertices in start range [{math.degrees(start_range_min):.2f}°, {math.degrees(start_range_max):.2f}°]")
+
+        start_angle_centroid = calculate_angle_centroid_area_weighted(vertices_at_start)
+        if start_angle_centroid is not None:
+            start_overlap_angle = abs(text_start_angle - start_angle_centroid)
+            self.log(f"Start angle centroid: {math.degrees(start_angle_centroid):.2f}°")
+            self.log(f"Start overlap angle: {math.degrees(start_overlap_angle):.2f}°")
+        else:
+            # Fallback to default
+            start_overlap_angle = math.radians(1.0)
+            self.log("No vertices found in start range, using default overlap")
+
+        # Calculate overlap for text end
+        end_range_min = text_end_angle - junction_angle_diff
+        end_range_max = text_end_angle
+
+        vertices_at_end = get_vertices_in_range(end_range_min, end_range_max)
+        self.log(f"Found {len(vertices_at_end)} vertices in end range [{math.degrees(end_range_min):.2f}°, {math.degrees(end_range_max):.2f}°]")
+
+        end_angle_centroid = calculate_angle_centroid_area_weighted(vertices_at_end)
+        if end_angle_centroid is not None:
+            end_overlap_angle = abs(text_end_angle - end_angle_centroid)
+            self.log(f"End angle centroid: {math.degrees(end_angle_centroid):.2f}°")
+            self.log(f"End overlap angle: {math.degrees(end_overlap_angle):.2f}°")
+        else:
+            # Fallback to default
+            end_overlap_angle = math.radians(1.0)
+            self.log("No vertices found in end range, using default overlap")
 
         # Cap maximum overlap to prevent aesthetic issues
-        max_overlap_angle = math.radians(3.0)  # Maximum 3 degrees
-        overlap_angle = min(overlap_angle, max_overlap_angle)
+        max_overlap_angle = math.radians(3.0)
+        start_overlap_angle = min(start_overlap_angle, max_overlap_angle)
+        end_overlap_angle = min(end_overlap_angle, max_overlap_angle)
 
-        self.log(f"Text thickness at boundaries: start={start_thickness:.2f}mm, end={end_thickness:.2f}mm")
-        self.log(f"Calculated overlap: {math.degrees(overlap_angle):.2f}°")
+        self.log(f"Final overlap angles: start={math.degrees(start_overlap_angle):.2f}°, end={math.degrees(end_overlap_angle):.2f}°")
 
-        return overlap_angle
+        # Return both overlap angles separately
+        return start_overlap_angle, end_overlap_angle
 
     def create_partial_ring(self, start_angle, end_angle, text_obj):
         """Create a partial ring from end_angle to start_angle (to fill the gap left by text)"""
@@ -554,16 +624,15 @@ class RingTextGenerator:
         vertical_segments = ring_config['vertical_segments']
 
         # Calculate required overlap based on actual text geometry
-        overlap_radians = self.calculate_required_overlap(text_obj, start_angle, end_angle)
-        overlap_degrees = math.degrees(overlap_radians)
+        start_overlap_angle, end_overlap_angle = self.calculate_required_overlap(text_obj, start_angle, end_angle)
 
         # Extend the ring angles to create overlap with text
-        ring_start = end_angle - overlap_radians  # Extend backward into text end
-        ring_end = start_angle + 2 * math.pi + overlap_radians  # Extend forward into text start
+        ring_start = end_angle - end_overlap_angle  # Extend backward into text end
+        ring_end = start_angle + 2 * math.pi + start_overlap_angle  # Extend forward into text start
         ring_span = ring_end - ring_start
 
         # Log the overlap information
-        self.log(f"Adding {overlap_degrees}° overlap on each end for manufacturing reliability")
+        self.log(f"Adding {math.degrees(start_overlap_angle):.2f}° overlap at start, {math.degrees(end_overlap_angle):.2f}° overlap at end")
         self.log(f"Original ring arc: {math.degrees(end_angle):.2f}° to {math.degrees(start_angle + 2 * math.pi):.2f}°")
         self.log(f"Extended ring arc: {math.degrees(ring_start):.2f}° to {math.degrees(ring_end):.2f}°")
 
@@ -676,7 +745,7 @@ class RingTextGenerator:
         bpy.context.view_layer.objects.active = ring_obj
         bpy.ops.object.shade_smooth()
 
-        self.log(f"Created partial ring with {overlap_degrees}° overlap: inner_d={ring_config['inner_diameter']}mm, "
+        self.log(f"Created partial ring with inner_d={ring_config['inner_diameter']}mm, "
                 f"outer_d={ring_config['outer_diameter']}mm, length={ring_config['length']}mm")
 
         return ring_obj
