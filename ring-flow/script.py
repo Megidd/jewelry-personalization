@@ -511,7 +511,14 @@ class RingTextGenerator:
 
                 # Calculate polar coordinates
                 radius = math.sqrt(x*x + y*y)
-                angle = math.atan2(x, y)  # Note: atan2(x, y) since angle 0 is at +X
+
+                # Since angle 0 is at +X and positive direction is from +X towards +Y
+                # We use standard atan2(y, x) but need to handle the coordinate system
+                angle = math.atan2(y, x)
+
+                # Normalize angle to [0, 2*pi]
+                if angle < 0:
+                    angle += 2 * math.pi
 
                 # Check if vertex is within the spatial range (inclusive boundaries)
                 if (angle_min <= angle <= angle_max and
@@ -561,14 +568,21 @@ class RingTextGenerator:
                 # Calculate angle from weighted centroid
                 centroid_x = total_weighted_x / total_weight
                 centroid_y = total_weighted_y / total_weight
-                return math.atan2(centroid_x, centroid_y)
+                angle = math.atan2(centroid_y, centroid_x)
+                # Normalize to [0, 2*pi]
+                if angle < 0:
+                    angle += 2 * math.pi
+                return angle
             else:
                 # Fallback to simple average
                 sum_x = sum(v.co.x for v in vertices)
                 sum_y = sum(v.co.y for v in vertices)
                 if sum_x == 0 and sum_y == 0:
                     return None
-                return math.atan2(sum_x, sum_y)
+                angle = math.atan2(sum_y, sum_x)
+                if angle < 0:
+                    angle += 2 * math.pi
+                return angle
 
         # Calculate overlap for text start
         start_range_min = text_start_angle
@@ -584,7 +598,7 @@ class RingTextGenerator:
             self.log(f"Start overlap angle: {math.degrees(start_overlap_angle):.2f}°")
         else:
             # Fallback to default
-            start_overlap_angle = math.radians(1.0)
+            start_overlap_angle = math.radians(2.0)
             self.log("No vertices found in start range, using default overlap")
 
         # Calculate overlap for text end
@@ -601,13 +615,8 @@ class RingTextGenerator:
             self.log(f"End overlap angle: {math.degrees(end_overlap_angle):.2f}°")
         else:
             # Fallback to default
-            end_overlap_angle = math.radians(1.0)
+            end_overlap_angle = math.radians(2.0)
             self.log("No vertices found in end range, using default overlap")
-
-        # Cap maximum overlap to prevent aesthetic issues
-        max_overlap_angle = math.radians(3.0)
-        start_overlap_angle = min(start_overlap_angle, max_overlap_angle)
-        end_overlap_angle = min(end_overlap_angle, max_overlap_angle)
 
         self.log(f"Final overlap angles: start={math.degrees(start_overlap_angle):.2f}°, end={math.degrees(end_overlap_angle):.2f}°")
 
