@@ -35,3 +35,9 @@ After each system reboot or login, the first time Blender is called, it might ta
 # Cursive fonts
 
 The available cursive fonts are inside `fonts` sub-directory. Font path is used inside the `config.json` file.
+
+# Sample result
+
+## Flow ring
+
+![Flow product screenshot](screenshots/ring-flow.png?raw=true "Flow product screenshot")
