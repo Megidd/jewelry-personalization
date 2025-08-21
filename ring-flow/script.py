@@ -112,12 +112,15 @@ class RingTextGenerator:
         # Validate text section
         text_config = self.config['text']
         
-        required_text_fields = ['content', 'font_path', 'font_size', 'depth', 'direction']
+        required_text_fields = ['content', 'font_path', 'font_size', 'depth']
         
         for field in required_text_fields:
             if field not in text_config:
                 self.log(f"ERROR: Missing required text field: {field}", "ERROR")
                 return False
+
+        # normal or inverted
+        text_config.setdefault('direction', 'normal')
 
         # Set defaults for spacing parameters if not specified
         text_config.setdefault('space_character', 0.95)

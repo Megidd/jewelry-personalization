@@ -7,6 +7,7 @@
     "vertical_segments": 64
   },
   "text": {
+    "_content_comment": "Will be converted to lower case, only alphabetic letters, only English letters",
     "content": "Linux",
     "_font_path_comment1": "../fonts/TTFs/Dancing_Script/static/DancingScript-Bold.ttf",
     "_font_path_comment2": "../fonts/TTFs/Dancing_Script/static/DancingScript-Regular.ttf",
@@ -18,11 +19,7 @@
     "_font_path_comment8": "../fonts/TTFs/Parisienne/Parisienne-Regular.ttf",
     "font_path": "../fonts/TTFs/Dancing_Script/static/DancingScript-Bold.ttf",
     "font_size": 10.0,
-    "depth": 0.5,
-    "direction": "normal",
-    "_space_character_comment": "Determines the overlap of text characters. Reduce to 0.7-1.0 for tighter text",
-    "space_character": 0.95,
-    "space_word": 0.95
+    "depth": 0.5
   },
   "material": {
     "name": "GOLD g/cm³",
