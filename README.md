@@ -41,3 +41,7 @@ The available cursive fonts are inside `fonts` sub-directory. Font path is used 
 ## Flow product
 
 ![Flow product screenshot](screenshots/ring-flow.png?raw=true "Flow product screenshot")
+
+## Emboss product
+
+![Emboss product screenshot](screenshots/ring-emboss.png?raw=true "Emboss product screenshot")
