@@ -123,8 +123,8 @@ class RingTextGenerator:
         text_config.setdefault('direction', 'normal')
 
         # Set defaults for spacing parameters if not specified
-        text_config.setdefault('space_character', 0.95)
-        text_config.setdefault('space_word', 0.95)
+        text_config.setdefault('space_character', 1.0)
+        text_config.setdefault('space_word', 1.0)
 
         # Validate spacing parameters
         if 'space_character' in text_config:
