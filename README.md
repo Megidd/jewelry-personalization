@@ -28,6 +28,10 @@ blender --background --python script.py -- config.json
 
 The above command can be directly executed on commandline too.
 
+## First call
+
+After each system reboot or login, the first time Blender is called, it might take some seconds. But subsequent calls would get quite fast.
+
 # Cursive fonts
 
 The available cursive fonts are inside `fonts` sub-directory. Font path is used inside the `config.json` file.
