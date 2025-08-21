@@ -187,7 +187,11 @@ class RingTextGenerator:
             return False
         
         # Remove newlines as specified
-        text_config['content'] = text.replace('\n', '').replace('\r', '')
+        text_config['content'] = text.replace('\n', '').replace('\r', '').replace(' ', '').lower()
+
+        # To keep only alphabetic letters
+        text = text_config['content']
+        text_config['content'] = "".join(char for char in text if char.isalpha())
         
         # Check text length
         if len(text_config['content']) > 500:
