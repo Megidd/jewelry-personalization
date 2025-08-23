@@ -55,3 +55,7 @@ One of our products is the **emboss** product which is available inside `ring-em
 Text letters are raised or embossed on the surface of the ring, so it's named the **emboss** product.
 
 ![Emboss product screenshot](screenshots/ring-emboss.png?raw=true "Emboss product screenshot")
+
+# Report
+
+The `config.json` contains a field for the path of the report JSON file. The report JSON contains the approximate weight of the generated product, among other stats.
