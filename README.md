@@ -40,8 +40,18 @@ The available cursive fonts are inside `fonts` sub-directory. Font path is used 
 
 ## Flow product
 
+One of our products is the **flow** product which is available inside `ring-flow` subfolder.
+
+Text letters have a continuous **flow** around the ring, so it's named the **flow** product.
+
+The text arc and the ring arc are explementary or conjugate, they would sum up to be 360 degrees.
+
 ![Flow product screenshot](screenshots/ring-flow.png?raw=true "Flow product screenshot")
 
 ## Emboss product
+
+One of our products is the **emboss** product which is available inside `ring-emboss` subfolder.
+
+Text letters are raised or embossed on the surface of the ring, so it's named the **emboss** product.
 
 ![Emboss product screenshot](screenshots/ring-emboss.png?raw=true "Emboss product screenshot")
